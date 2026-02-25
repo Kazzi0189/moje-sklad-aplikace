@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hlasový Skladník</title>
+    <style>
+        /* Jednoduchý a čistý design pro mobil */
+        body { font-family: sans-serif; background: #f4f7f6; padding: 10px; margin: 0; }
+        .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; font-size: 22px; }
+        button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
+        #btn-mic { background: #e74c3c; color: white; }
+        #btn-mic.active { background: #2ecc71; }
+        #btn-export { background: #3498db; color: white; }
+        
+        /* Styl tabulky */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 16px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f8f9fa; }
+        
+        /* Kouzlo: Zvýraznění buněk, do kterých se dá kliknout a psát */
+        td[contenteditable="true"] { background-color: #fffde7; }
+        td[contenteditable="true"]:focus { background-color: #e3f2fd; outline: 2px solid #3498db; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Skladník 📦</h1>
+    <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
+    <button id="btn-export">💾 ULOŽIT DO EXCELU</button>
+    
+    <table id="tabulka">
+        <thead>
+            <tr>
+                <th>Katalog (A)</th>
+                <th>Počet (B)</th>
+                <th>Pozice (C)</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+</div>
+
+<script>
+    const btnMic = document.getElementById('btn-mic');
+    const tbody = document.querySelector('#tabulka tbody');
+    
+    // Nastavení rozpoznávání hlasu
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let rec;
+
+    if (SpeechRecognition) {
+        rec = new SpeechRecognition();
+        rec.lang = 'cs-CZ';
+        
+        btnMic.onclick = () => {
+            rec.start();
+            btnMic.classList.add('active');
+            btnMic.innerText = "⏳ POSLOUCHÁM...";
+        };
+
+        rec.onresult = (event) => {
+            const text = event.results[0][0].transcript.toLowerCase();
+            btnMic.classList.remove('active');
+            btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
+            
+            // Zatím hloupé rozdělení slov (to budeme ladit příště)
+            const slova = text.split(" ");
+            const katalog = slova[0] || "";
+            const pocet = slova[1] || "";
+            const pozice = slova.slice(2).join(" ") || "";
+
+            pridejRadek(katalog, pocet, pozice);
+        };
+
+        rec.onerror = () => {
+            btnMic.classList.remove('active');
+            btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ (Chyba/Offline)";
+        };
+    } else {
+        btnMic.innerText = "❌ Prohlížeč nepodporuje hlas";
+    }
+
+    // Funkce pro přidání řádku (Atribut contenteditable="true" umožňuje ruční přepis)
+    function pridejRadek(katalog, pocet, pozice) {
+        const radek = document.createElement('tr');
+        radek.innerHTML = `
+            <td contenteditable="true">${katalog}</td>
+            <td contenteditable="true">${pocet}</td>
+            <td contenteditable="true">${pozice}</td>
+        `;
+        tbody.appendChild(radek);
+    }
+
+    // Přidáme jeden prázdný zkušební řádek hned po startu, ať si můžeš vyzkoušet ruční psaní
+    pridejRadek("Klikni", "a", "přepiš mě");
+
+    // Export do CSV pro Excel
+    document.getElementById('btn-export').onclick = () => {
+        let csv = "Katalog;Pocet;Pozice\n";
+        document.querySelectorAll("tbody tr").forEach(tr => {
+            const tds = tr.querySelectorAll("td");
+            csv += `${tds[0].innerText};${tds[1].innerText};${tds[2].innerText}\n`;
+        });
+        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inventura.csv';
+        a.click();
+    };
+</script>
+</body>
+</html>
