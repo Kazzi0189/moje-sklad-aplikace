@@ -9,7 +9,6 @@
         .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #333; font-size: 22px; margin-top: 0; }
         
-        /* Tlačítka a vstupy */
         button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
         #btn-mic { background: #e74c3c; color: white; }
         #btn-mic.active { background: #2ecc71; }
@@ -21,7 +20,6 @@
         
         #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
         
-        /* Tabulka */
         table { width: 100%; border-collapse: collapse; font-size: 16px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #f8f9fa; }
@@ -51,7 +49,7 @@
             </tr>
         </thead>
         <tbody>
-            </tbody>
+        </tbody>
     </table>
 </div>
 
@@ -61,7 +59,6 @@
     const filtr = document.getElementById('filtr-pozice');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // Slovník pro převod běžných slov na čísla
     const cislaSlovy = {
         "nula":"0", "jedna":"1", "jeden":"1", "dva":"2", "tři":"3", "čtyři":"4", "pět":"5",
         "šest":"6", "sedm":"7", "osm":"8", "devět":"9", "deset":"10",
@@ -73,6 +70,22 @@
         let vycisteno = slovo.trim().toLowerCase();
         return cislaSlovy[vycisteno] ? cislaSlovy[vycisteno] : vycisteno;
     }
+
+    // Funkce pro filtraci, abychom ji mohli volat odkudkoliv
+    function aplikujFiltr() {
+        const hledano = filtr.value.toLowerCase();
+        const radky = tbody.querySelectorAll('tr');
+        radky.forEach(radek => {
+            const poziceText = radek.querySelectorAll('td')[2].innerText.toLowerCase();
+            if (poziceText.includes(hledano)) {
+                radek.style.display = '';
+            } else {
+                radek.style.display = 'none';
+            }
+        });
+    }
+
+    filtr.addEventListener('input', aplikujFiltr);
 
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
@@ -90,27 +103,51 @@
             btnMic.classList.remove('active');
             btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
+            // 1. Chytřejší převod slovních nul ("tři nuly" -> "000")
+            text = text.replace(/(jedna|jednu|1)\s*(nula|nulu)/g, "0");
+            text = text.replace(/(dvě|2)\s*nuly/g, "00");
+            text = text.replace(/(tři|3)\s*nuly/g, "000");
+            text = text.replace(/(čtyři|4)\s*nuly/g, "0000");
+            text = text.replace(/(pět|5)\s*nul/g, "00000");
+            text = text.replace(/(šest|6)\s*nul/g, "000000");
+
             let katalog = "";
             let pocet = "";
             let pozice = "";
 
-            // Ořezání pomocí regulárních výrazů
-            const castKatalog = text.match(/(?:katalog)(.*?)(?=počet|počtu|kusů|pozice|pozici|$)/);
-            const castPocet = text.match(/(?:počet|počtu|kusů)(.*?)(?=katalog|pozice|pozici|$)/);
-            const castPozice = text.match(/(?:pozice|pozici)(.*?)(?=katalog|počet|počtu|kusů|$)/);
+            // 2. Extrakce slov bez slova "kusů" jako brzdy
+            const castKatalog = text.match(/(?:katalog)(.*?)(?=počet|počtu|pozice|pozici|$)/);
+            const castPocet = text.match(/(?:počet|počtu)(.*?)(?=katalog|pozice|pozici|$)/);
+            const castPozice = text.match(/(?:pozice|pozici)(.*?)(?=katalog|počet|počtu|$)/);
 
             if (castKatalog) {
                 katalog = castKatalog[1].trim();
-                // OPRAVA MEZERY: Najde "pn" a mezeru před číslem a mezeru smaže (např. pn 7630002 -> pn7630002)
-                katalog = katalog.replace(/(pn)\s+(\d+)/gi, "$1$2");
+                // Spojení PN i LM: vezme všechna čísla s mezerami za zkratkou a mezery vymaže
+                katalog = katalog.replace(/(pn|lm)\s*([\d\s]+)/gi, (match, prefix, numbers) => {
+                    return prefix + numbers.replace(/\s+/g, '');
+                });
             }
-            if (castPocet) pocet = textNaCislo(castPocet[1]);
-            if (castPozice) pozice = castPozice[1].trim();
 
-            if (!katalog && !pocet && !pozice) katalog = text.replace(/(pn)\s+(\d+)/gi, "$1$2");
+            if (castPocet) {
+                // Vymažeme slova jako "kusů" a necháme jen číslo
+                let cistyPocet = castPocet[1].replace(/kusů|kusy|kus|ks/gi, '').trim();
+                pocet = textNaCislo(cistyPocet);
+            }
 
-            // LOGIKA PRO SPOJOVÁNÍ PO PAUZE
-            const posledniRadek = tbody.lastElementChild;
+            if (castPozice) {
+                pozice = castPozice[1].trim();
+            }
+
+            if (!katalog && !pocet && !pozice) {
+                katalog = text.replace(/(pn|lm)\s*([\d\s]+)/gi, (match, prefix, numbers) => {
+                    return prefix + numbers.replace(/\s+/g, '');
+                });
+            }
+
+            // Najdeme poslední VIDITELNÝ řádek (aby filtr nedělal neplechu při doplňování)
+            const viditelneRadky = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.style.display !== 'none');
+            const posledniRadek = viditelneRadky.length > 0 ? viditelneRadky[viditelneRadky.length - 1] : null;
+
             let vytvoritNovyRadek = true;
 
             if (posledniRadek) {
@@ -119,17 +156,19 @@
                 const pocAktualni = bunky[1].innerText.trim();
                 const pozAktualni = bunky[2].innerText.trim();
 
-                // Pokud jsme řekli např. jen "počet 50", a v posledním řádku počet chybí
                 if (!katalog && (pocet || pozice)) {
                     if (pocet && !pocAktualni) bunky[1].innerText = pocet;
                     if (pozice && !pozAktualni) bunky[2].innerText = pozice;
-                    vytvoritNovyRadek = false; // Nevytváříme nový řádek, jen jsme doplnili starý
+                    vytvoritNovyRadek = false; 
                 }
             }
 
             if (vytvoritNovyRadek && (katalog || pocet || pozice)) {
                 pridejRadek(katalog, pocet, pozice);
             }
+
+            // Po nadiktování rovnou znovu srovnáme tabulku podle filtru
+            aplikujFiltr();
         };
 
         rec.onerror = () => {
@@ -148,32 +187,18 @@
         tbody.appendChild(radek);
     }
 
-    // Filtr pozic
-    filtr.addEventListener('input', function() {
-        const hledano = this.value.toLowerCase();
-        const radky = tbody.querySelectorAll('tr');
-        radky.forEach(radek => {
-            const poziceText = radek.querySelectorAll('td')[2].innerText.toLowerCase();
-            if (poziceText.includes(hledano)) {
-                radek.style.display = '';
-            } else {
-                radek.style.display = 'none';
-            }
-        });
-    });
-
-    // Smazat poslední řádek
     document.getElementById('btn-smazat').onclick = () => {
-        if (tbody.lastElementChild) {
-            tbody.removeChild(tbody.lastElementChild);
+        // Maže jen poslední viditelný řádek (kdyby byl zapnutý filtr)
+        const viditelneRadky = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.style.display !== 'none');
+        if (viditelneRadky.length > 0) {
+            tbody.removeChild(viditelneRadky[viditelneRadky.length - 1]);
         }
     };
 
-    // Export
     document.getElementById('btn-export').onclick = () => {
         let csv = "Katalog;Pocet;Pozice\n";
         document.querySelectorAll("tbody tr").forEach(tr => {
-            if(tr.style.display !== 'none') { // Uloží jen vyfiltrované řádky
+            if(tr.style.display !== 'none') {
                 const tds = tr.querySelectorAll("td");
                 csv += `${tds[0].innerText};${tds[1].innerText};${tds[2].innerText}\n`;
             }
