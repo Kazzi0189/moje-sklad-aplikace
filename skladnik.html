@@ -48,9 +48,7 @@
     const filtr = document.getElementById('filtr-pozice');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // Rozšířený slovník pro zachycení všech variant
     const cislaSlovy = {
-        "nula": "0", "nulu": "0", "nuly": "0", "nul": "0",
         "jedna": "1", "jeden": "1", "dva": "2", "tři": "3", "čtyři": "4", "pět": "5",
         "šest": "6", "sedm": "7", "osm": "8", "devět": "9", "deset": "10"
     };
@@ -64,7 +62,6 @@
     }
 
     function pridejRadek(kat = "", poc = "", poz = "") {
-        // Pokud filtrujeme, automaticky předvyplníme pozici podle filtru
         if (!poz && filtr.value.trim() !== "") {
             poz = filtr.value.trim();
         }
@@ -92,7 +89,18 @@
             let text = event.results[0][0].transcript.toLowerCase();
             btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
-            // PŘEVOD SLOV NA ČÍSLA (v celém textu)
+            // 1. NEJDŘÍV CHYTÁME NÁSOBKY NUL (např. "čtyři nuly" -> "0000")
+            // Zahrnuje to i variantu, kdy by Google přeložil "čtyři" rovnou na "4 nuly"
+            text = text.replace(/(dvě|dve|2)\s*nuly/g, "00");
+            text = text.replace(/(tři|tri|3)\s*nuly/g, "000");
+            text = text.replace(/(čtyři|ctyri|4)\s*nuly/g, "0000");
+            text = text.replace(/(pět|pet|5)\s*nul/g, "00000");
+            text = text.replace(/(šest|sest|6)\s*nul/g, "000000");
+
+            // 2. POTÉ CHYTÁME VŠECHNY ZBÝVAJÍCÍ NULY (vyřeší to i 4x řečené "nula nula nula nula")
+            text = text.replace(/nula|nulu|nuly|nul/g, "0");
+
+            // 3. AŽ NAKONEC PŘEVÁDÍME OSTATNÍ SLOVA NA ČÍSLA
             for (let slovo in cislaSlovy) {
                 text = text.replace(new RegExp(slovo, 'g'), cislaSlovy[slovo]);
             }
@@ -113,9 +121,9 @@
                 if (kontext === "pozice") pozice += d + " ";
             });
 
-            // Čištění Katalogu (PN/LM a slepení čísel)
+            // Čištění Katalogu (PN/LM a slepení čísel - odstraní mezery)
             katalog = katalog.replace(/katalog/g, "").trim();
-            katalog = katalog.replace(/(pn|lm)([\d\s]+)/gi, (m, p, n) => p + n.replace(/\s+/g, ''));
+            katalog = katalog.replace(/(pn|lm)\s*([\d\s]+)/gi, (m, p, n) => p + n.replace(/\s+/g, ''));
             
             // Čištění Počtu (jen číslice)
             pocet = pocet.replace(/[^\d]/g, '');
@@ -132,6 +140,11 @@
             } else {
                 pridejRadek(katalog, pocet, pozice);
             }
+        };
+
+        rec.onerror = () => {
+            btnMic.classList.remove('active');
+            btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
         };
     }
 
