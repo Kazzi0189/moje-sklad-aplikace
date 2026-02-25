@@ -8,23 +8,18 @@
         body { font-family: sans-serif; background: #f4f7f6; padding: 10px; margin: 0; }
         .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #333; font-size: 22px; margin-top: 0; }
-        
         button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
         #btn-mic { background: #e74c3c; color: white; }
         #btn-mic.active { background: #2ecc71; }
-        
         .tlacitka-pruh { display: flex; gap: 10px; margin-bottom: 10px; }
         .tlacitka-pruh button { margin-bottom: 0; font-size: 14px; padding: 10px; }
         #btn-smazat { background: #e67e22; color: white; }
         #btn-export { background: #3498db; color: white; }
-        
         #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
-        
         table { width: 100%; border-collapse: collapse; font-size: 16px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #f8f9fa; }
         td[contenteditable="true"] { background-color: #fffde7; }
-        td[contenteditable="true"]:focus { background-color: #e3f2fd; outline: 2px solid #3498db; }
     </style>
 </head>
 <body>
@@ -32,14 +27,11 @@
 <div class="container">
     <h1>Skladník 📦</h1>
     <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
-    
     <div class="tlacitka-pruh">
         <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
         <button id="btn-export">💾 ULOŽIT EXCEL</button>
     </div>
-
     <input type="text" id="filtr-pozice" placeholder="🔍 Hledat v pozicích (např. B2)...">
-    
     <table id="tabulka">
         <thead>
             <tr>
@@ -48,8 +40,7 @@
                 <th>Pozice</th>
             </tr>
         </thead>
-        <tbody>
-        </tbody>
+        <tbody></tbody>
     </table>
 </div>
 
@@ -60,28 +51,15 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     const cislaSlovy = {
-        "nula":"0", "jedna":"1", "jeden":"1", "dva":"2", "tři":"3", "čtyři":"4", "pět":"5",
-        "šest":"6", "sedm":"7", "osm":"8", "devět":"9", "deset":"10",
-        "dvaceti":"20", "dvacet":"20", "třicet":"30", "čtyřicet":"40", "padesát":"50",
-        "šedesát":"60", "sedmdesát":"70", "osmdesát":"80", "devadesát":"90", "sto":"100"
+        "nula":"0", "nuly":"0", "nul":"0", "jedna":"1", "jeden":"1", "dva":"2", "tři":"3", "čtyři":"4", "pět":"5",
+        "šest":"6", "sedm":"7", "osm":"8", "devět":"9", "deset":"10", "sto":"100"
     };
 
-    function textNaCislo(slovo) {
-        let vycisteno = slovo.trim().toLowerCase();
-        return cislaSlovy[vycisteno] ? cislaSlovy[vycisteno] : vycisteno;
-    }
-
-    // Funkce pro filtraci, abychom ji mohli volat odkudkoliv
     function aplikujFiltr() {
         const hledano = filtr.value.toLowerCase();
-        const radky = tbody.querySelectorAll('tr');
-        radky.forEach(radek => {
+        document.querySelectorAll('#tabulka tbody tr').forEach(radek => {
             const poziceText = radek.querySelectorAll('td')[2].innerText.toLowerCase();
-            if (poziceText.includes(hledano)) {
-                radek.style.display = '';
-            } else {
-                radek.style.display = 'none';
-            }
+            radek.style.display = poziceText.includes(hledano) ? '' : 'none';
         });
     }
 
@@ -90,8 +68,7 @@
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'cs-CZ';
-        rec.continuous = false;
-
+        
         btnMic.onclick = () => {
             rec.start();
             btnMic.classList.add('active');
@@ -103,71 +80,49 @@
             btnMic.classList.remove('active');
             btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
-            // 1. Chytřejší převod slovních nul ("tři nuly" -> "000")
-            text = text.replace(/(jedna|jednu|1)\s*(nula|nulu)/g, "0");
-            text = text.replace(/(dvě|2)\s*nuly/g, "00");
-            text = text.replace(/(tři|3)\s*nuly/g, "000");
-            text = text.replace(/(čtyři|4)\s*nuly/g, "0000");
-            text = text.replace(/(pět|5)\s*nul/g, "00000");
-            text = text.replace(/(šest|6)\s*nul/g, "000000");
+            // 1. PŘEVOD SLOV NA ČÍSLA (včetně nul a počtů)
+            Object.keys(cislaSlovy).forEach(slovo => {
+                const reg = new RegExp(slovo, 'g');
+                text = text.replace(reg, cislaSlovy[slovo]);
+            });
 
-            let katalog = "";
-            let pocet = "";
-            let pozice = "";
+            // 2. EXTRKACE DAT
+            let katalog = "", pocet = "", pozice = "";
 
-            // 2. Extrakce slov bez slova "kusů" jako brzdy
-            const castKatalog = text.match(/(?:katalog)(.*?)(?=počet|počtu|pozice|pozici|$)/);
-            const castPocet = text.match(/(?:počet|počtu)(.*?)(?=katalog|pozice|pozici|$)/);
-            const castPozice = text.match(/(?:pozice|pozici)(.*?)(?=katalog|počet|počtu|$)/);
+            const mKat = text.match(/(?:katalog)(.*?)(?=počet|pozice|$)/);
+            const mPoc = text.match(/(?:počet)(.*?)(?=katalog|pozice|$)/);
+            const mPoz = text.match(/(?:pozice)(.*?)(?=katalog|počet|$)/);
 
-            if (castKatalog) {
-                katalog = castKatalog[1].trim();
-                // Spojení PN i LM: vezme všechna čísla s mezerami za zkratkou a mezery vymaže
-                katalog = katalog.replace(/(pn|lm)\s*([\d\s]+)/gi, (match, prefix, numbers) => {
-                    return prefix + numbers.replace(/\s+/g, '');
-                });
+            katalog = mKat ? mKat[1].trim() : (!mPoc && !mPoz ? text : "");
+            pocet = mPoc ? mPoc[1].trim() : "";
+            pozice = mPoz ? mPoz[1].trim() : "";
+
+            // 3. AGRESIVNÍ ČIŠTĚNÍ PN / LM (odstraní mezery v číslech)
+            const cistiKod = (str) => {
+                return str.replace(/(pn|lm)\s*([\d\s]+)/gi, (m, p, n) => p + n.replace(/\s+/g, ''));
+            };
+            katalog = cistiKod(katalog);
+
+            // 4. ČIŠTĚNÍ POČTU (pouze čísla)
+            pocet = pocet.replace(/[^\d]/g, '');
+
+            // 5. DOPLŇOVÁNÍ DO FILTROVANÉ TABULKY
+            const viditelne = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+            const posledni = viditelne[viditelne.length - 1];
+
+            if (posledni && !katalog && (pocet || pozice)) {
+                const tds = posledni.querySelectorAll('td');
+                if (pocet && !tds[1].innerText) tds[1].innerText = pocet;
+                if (pozice && !tds[2].innerText) tds[2].innerText = pozice;
+            } else if (katalog || pocet || pozice) {
+                const radek = document.createElement('tr');
+                radek.innerHTML = `
+                    <td contenteditable="true">${katalog}</td>
+                    <td contenteditable="true">${pocet}</td>
+                    <td contenteditable="true">${pozice}</td>
+                `;
+                tbody.appendChild(radek);
             }
-
-            if (castPocet) {
-                // Vymažeme slova jako "kusů" a necháme jen číslo
-                let cistyPocet = castPocet[1].replace(/kusů|kusy|kus|ks/gi, '').trim();
-                pocet = textNaCislo(cistyPocet);
-            }
-
-            if (castPozice) {
-                pozice = castPozice[1].trim();
-            }
-
-            if (!katalog && !pocet && !pozice) {
-                katalog = text.replace(/(pn|lm)\s*([\d\s]+)/gi, (match, prefix, numbers) => {
-                    return prefix + numbers.replace(/\s+/g, '');
-                });
-            }
-
-            // Najdeme poslední VIDITELNÝ řádek (aby filtr nedělal neplechu při doplňování)
-            const viditelneRadky = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.style.display !== 'none');
-            const posledniRadek = viditelneRadky.length > 0 ? viditelneRadky[viditelneRadky.length - 1] : null;
-
-            let vytvoritNovyRadek = true;
-
-            if (posledniRadek) {
-                const bunky = posledniRadek.querySelectorAll('td');
-                const katAktualni = bunky[0].innerText.trim();
-                const pocAktualni = bunky[1].innerText.trim();
-                const pozAktualni = bunky[2].innerText.trim();
-
-                if (!katalog && (pocet || pozice)) {
-                    if (pocet && !pocAktualni) bunky[1].innerText = pocet;
-                    if (pozice && !pozAktualni) bunky[2].innerText = pozice;
-                    vytvoritNovyRadek = false; 
-                }
-            }
-
-            if (vytvoritNovyRadek && (katalog || pocet || pozice)) {
-                pridejRadek(katalog, pocet, pozice);
-            }
-
-            // Po nadiktování rovnou znovu srovnáme tabulku podle filtru
             aplikujFiltr();
         };
 
@@ -177,36 +132,24 @@
         };
     }
 
-    function pridejRadek(kat, poc, poz) {
-        const radek = document.createElement('tr');
-        radek.innerHTML = `
-            <td contenteditable="true">${kat}</td>
-            <td contenteditable="true">${poc}</td>
-            <td contenteditable="true">${poz}</td>
-        `;
-        tbody.appendChild(radek);
-    }
-
     document.getElementById('btn-smazat').onclick = () => {
-        // Maže jen poslední viditelný řádek (kdyby byl zapnutý filtr)
-        const viditelneRadky = Array.from(tbody.querySelectorAll('tr')).filter(tr => tr.style.display !== 'none');
-        if (viditelneRadky.length > 0) {
-            tbody.removeChild(viditelneRadky[viditelneRadky.length - 1]);
-        }
+        const viditelne = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+        if (viditelne.length > 0) tbody.removeChild(viditelne[viditelne.length - 1]);
     };
 
     document.getElementById('btn-export').onclick = () => {
-        let csv = "Katalog;Pocet;Pozice\n";
-        document.querySelectorAll("tbody tr").forEach(tr => {
-            if(tr.style.display !== 'none') {
-                const tds = tr.querySelectorAll("td");
+        let csv = "\ufeffKatalog;Pocet;Pozice\n";
+        tbody.querySelectorAll('tr').forEach(tr => {
+            if (tr.style.display !== 'none') {
+                const tds = tr.querySelectorAll('td');
                 csv += `${tds[0].innerText};${tds[1].innerText};${tds[2].innerText}\n`;
             }
         });
-        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
-        a.href = url; a.download = 'inventura.csv'; a.click();
+        a.href = URL.createObjectURL(blob);
+        a.download = 'inventura.csv';
+        a.click();
     };
 </script>
 </body>
