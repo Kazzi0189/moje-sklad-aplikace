@@ -5,21 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hlasový Skladník</title>
     <style>
-        /* Jednoduchý a čistý design pro mobil */
         body { font-family: sans-serif; background: #f4f7f6; padding: 10px; margin: 0; }
         .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; font-size: 22px; }
+        h1 { text-align: center; color: #333; font-size: 22px; margin-top: 0; }
+        
+        /* Tlačítka a vstupy */
         button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
         #btn-mic { background: #e74c3c; color: white; }
         #btn-mic.active { background: #2ecc71; }
+        
+        .tlacitka-pruh { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tlacitka-pruh button { margin-bottom: 0; font-size: 14px; padding: 10px; }
+        #btn-smazat { background: #e67e22; color: white; }
         #btn-export { background: #3498db; color: white; }
         
-        /* Styl tabulky */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 16px; }
+        #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        
+        /* Tabulka */
+        table { width: 100%; border-collapse: collapse; font-size: 16px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #f8f9fa; }
-        
-        /* Kouzlo: Zvýraznění buněk, do kterých se dá kliknout a psát */
         td[contenteditable="true"] { background-color: #fffde7; }
         td[contenteditable="true"]:focus { background-color: #e3f2fd; outline: 2px solid #3498db; }
     </style>
@@ -29,14 +34,20 @@
 <div class="container">
     <h1>Skladník 📦</h1>
     <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
-    <button id="btn-export">💾 ULOŽIT DO EXCELU</button>
+    
+    <div class="tlacitka-pruh">
+        <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
+        <button id="btn-export">💾 ULOŽIT EXCEL</button>
+    </div>
+
+    <input type="text" id="filtr-pozice" placeholder="🔍 Hledat v pozicích (např. B2)...">
     
     <table id="tabulka">
         <thead>
             <tr>
-                <th>Katalog (A)</th>
-                <th>Počet (B)</th>
-                <th>Pozice (C)</th>
+                <th>Katalog</th>
+                <th>Počet</th>
+                <th>Pozice</th>
             </tr>
         </thead>
         <tbody>
@@ -47,7 +58,21 @@
 <script>
     const btnMic = document.getElementById('btn-mic');
     const tbody = document.querySelector('#tabulka tbody');
+    const filtr = document.getElementById('filtr-pozice');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    // Slovník pro převod běžných slov na čísla
+    const cislaSlovy = {
+        "nula":"0", "jedna":"1", "jeden":"1", "dva":"2", "tři":"3", "čtyři":"4", "pět":"5",
+        "šest":"6", "sedm":"7", "osm":"8", "devět":"9", "deset":"10",
+        "dvaceti":"20", "dvacet":"20", "třicet":"30", "čtyřicet":"40", "padesát":"50",
+        "šedesát":"60", "sedmdesát":"70", "osmdesát":"80", "devadesát":"90", "sto":"100"
+    };
+
+    function textNaCislo(slovo) {
+        let vycisteno = slovo.trim().toLowerCase();
+        return cislaSlovy[vycisteno] ? cislaSlovy[vycisteno] : vycisteno;
+    }
 
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
@@ -65,34 +90,46 @@
             btnMic.classList.remove('active');
             btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
-            // POMOCNÁ FUNKCE: Vyčistí text od klíčových slov
-            function vycisti(veta, klicovaSlova) {
-                let vysledek = veta;
-                klicovaSlova.forEach(slovo => {
-                    vysledek = vysledek.replace(slovo, "");
-                });
-                return vysledek.trim();
-            }
-
             let katalog = "";
             let pocet = "";
             let pozice = "";
 
-            // Rozdělení textu pomocí regulárních výrazů pro větší přesnost
+            // Ořezání pomocí regulárních výrazů
             const castKatalog = text.match(/(?:katalog)(.*?)(?=počet|počtu|kusů|pozice|pozici|$)/);
             const castPocet = text.match(/(?:počet|počtu|kusů)(.*?)(?=katalog|pozice|pozici|$)/);
             const castPozice = text.match(/(?:pozice|pozici)(.*?)(?=katalog|počet|počtu|kusů|$)/);
 
-            if (castKatalog) katalog = castKatalog[1].trim();
-            if (castPocet) pocet = castPocet[1].trim();
+            if (castKatalog) {
+                katalog = castKatalog[1].trim();
+                // OPRAVA MEZERY: Najde "pn" a mezeru před číslem a mezeru smaže (např. pn 7630002 -> pn7630002)
+                katalog = katalog.replace(/(pn)\s+(\d+)/gi, "$1$2");
+            }
+            if (castPocet) pocet = textNaCislo(castPocet[1]);
             if (castPozice) pozice = castPozice[1].trim();
 
-            // Pokud jsi neřekl žádné klíčové slovo, dej vše do katalogu
-            if (!katalog && !pocet && !pozice) {
-                katalog = text;
+            if (!katalog && !pocet && !pozice) katalog = text.replace(/(pn)\s+(\d+)/gi, "$1$2");
+
+            // LOGIKA PRO SPOJOVÁNÍ PO PAUZE
+            const posledniRadek = tbody.lastElementChild;
+            let vytvoritNovyRadek = true;
+
+            if (posledniRadek) {
+                const bunky = posledniRadek.querySelectorAll('td');
+                const katAktualni = bunky[0].innerText.trim();
+                const pocAktualni = bunky[1].innerText.trim();
+                const pozAktualni = bunky[2].innerText.trim();
+
+                // Pokud jsme řekli např. jen "počet 50", a v posledním řádku počet chybí
+                if (!katalog && (pocet || pozice)) {
+                    if (pocet && !pocAktualni) bunky[1].innerText = pocet;
+                    if (pozice && !pozAktualni) bunky[2].innerText = pozice;
+                    vytvoritNovyRadek = false; // Nevytváříme nový řádek, jen jsme doplnili starý
+                }
             }
 
-            pridejRadek(katalog, pocet, pozice);
+            if (vytvoritNovyRadek && (katalog || pocet || pozice)) {
+                pridejRadek(katalog, pocet, pozice);
+            }
         };
 
         rec.onerror = () => {
@@ -111,18 +148,41 @@
         tbody.appendChild(radek);
     }
 
+    // Filtr pozic
+    filtr.addEventListener('input', function() {
+        const hledano = this.value.toLowerCase();
+        const radky = tbody.querySelectorAll('tr');
+        radky.forEach(radek => {
+            const poziceText = radek.querySelectorAll('td')[2].innerText.toLowerCase();
+            if (poziceText.includes(hledano)) {
+                radek.style.display = '';
+            } else {
+                radek.style.display = 'none';
+            }
+        });
+    });
+
+    // Smazat poslední řádek
+    document.getElementById('btn-smazat').onclick = () => {
+        if (tbody.lastElementChild) {
+            tbody.removeChild(tbody.lastElementChild);
+        }
+    };
+
+    // Export
     document.getElementById('btn-export').onclick = () => {
         let csv = "Katalog;Pocet;Pozice\n";
         document.querySelectorAll("tbody tr").forEach(tr => {
-            const tds = tr.querySelectorAll("td");
-            csv += `${tds[0].innerText};${tds[1].innerText};${tds[2].innerText}\n`;
+            if(tr.style.display !== 'none') { // Uloží jen vyfiltrované řádky
+                const tds = tr.querySelectorAll("td");
+                csv += `${tds[0].innerText};${tds[1].innerText};${tds[2].innerText}\n`;
+            }
         });
         const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = 'inventura.csv'; a.click();
     };
-</script>
 </script>
 </body>
 </html>
