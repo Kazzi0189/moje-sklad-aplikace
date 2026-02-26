@@ -7,13 +7,13 @@
     <style>
         body { font-family: sans-serif; background: #f4f7f6; padding: 10px; margin: 0; }
         .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; font-size: 22px; margin-top: 0; margin-bottom: 5px; }
-        #debug-text { font-size: 13px; color: #7f8c8d; text-align: center; margin-bottom: 15px; min-height: 18px; font-style: italic; }
+        h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 5px; }
+        #debug-text { font-size: 13px; color: #7f8c8d; text-align: center; margin-bottom: 15px; min-height: 18px; font-style: italic; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; }
         #btn-mic { background: #e74c3c; }
         #btn-mic.active { background: #2ecc71; }
-        .tlacitka-pruh { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-        .tlacitka-pruh button { flex: 1; min-width: 100px; font-size: 13px; padding: 12px 5px; margin-bottom: 0; }
+        .tlacitka-pruh { display: flex; gap: 8px; margin-bottom: 10px; }
+        .tlacitka-pruh button { flex: 1; font-size: 13px; padding: 12px 5px; margin-bottom: 0; }
         #btn-smazat { background: #e67e22; }
         #btn-pridat { background: #34495e; }
         #btn-export { background: #3498db; }
@@ -28,12 +28,12 @@
 
 <div class="container">
     <h1>Skladník 📦</h1>
-    <div id="debug-text">Zde uvidíš, co přesně telefon slyšel...</div>
+    <div id="debug-text">Zde uvidíš surový odposlech...</div>
     <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
     <div class="tlacitka-pruh">
-        <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
+        <button id="btn-smazat">🗑️ SMAZAT</button>
         <button id="btn-pridat">➕ PŘIDAT RUČNĚ</button>
-        <button id="btn-export">💾 ULOŽIT EXCEL</button>
+        <button id="btn-export">💾 EXCEL</button>
     </div>
     <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici (např. C2)...">
     <table id="tabulka">
@@ -56,18 +56,8 @@
         "šest": "6", "sedm": "7", "osm": "8", "devět": "9", "deset": "10"
     };
 
-    function aplikujFiltr() {
-        const hledano = filtr.value.toLowerCase().trim();
-        document.querySelectorAll('#tabulka tbody tr').forEach(radek => {
-            const poziceText = radek.querySelectorAll('td')[2].innerText.toLowerCase();
-            radek.style.display = (hledano === "" || poziceText.includes(hledano)) ? '' : 'none';
-        });
-    }
-
     function pridejRadek(kat = "", poc = "", poz = "") {
-        if (!poz && filtr.value.trim() !== "") {
-            poz = filtr.value.trim();
-        }
+        if (!poz && filtr.value.trim() !== "") poz = filtr.value.trim();
         const radek = document.createElement('tr');
         radek.innerHTML = `
             <td contenteditable="true">${kat}</td>
@@ -77,6 +67,13 @@
         tbody.appendChild(radek);
         aplikujFiltr();
         return radek;
+    }
+
+    function aplikujFiltr() {
+        const h = filtr.value.toLowerCase().trim();
+        document.querySelectorAll('#tabulka tbody tr').forEach(r => {
+            r.style.display = (h === "" || r.cells[2].innerText.toLowerCase().includes(h)) ? '' : 'none';
+        });
     }
 
     filtr.addEventListener('input', aplikujFiltr);
@@ -89,81 +86,64 @@
         btnMic.onclick = () => { rec.start(); btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
 
         rec.onresult = (event) => {
-            // Získáme surový text a hned ho ukážeme uživateli
-            let rawText = event.results[0][0].transcript.toLowerCase();
-            debugText.innerText = '🤖 Slyšel jsem: "' + rawText + '"';
+            let raw = event.results[0][0].transcript.toLowerCase();
+            debugText.innerText = '🤖 Slyšel jsem: "' + raw + '"';
+            btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
+
+            // Čištění textu
+            let t = raw.replace(/[.,-]/g, " ");
+
+            // Násobky nul
+            t = t.replace(/(čtyři|4)\s*(nuly|nula|nul)/g, "0000");
+            t = t.replace(/(tři|3)\s*(nuly|nula|nul)/g, "000");
+            t = t.replace(/(dvě|2)\s*(nuly|nula|nul)/g, "00");
+            t = t.replace(/nula|nulu|nuly|nul/g, "0");
+
+            for (let s in cislaSlovy) { t = t.replace(new RegExp(s, 'g'), cislaSlovy[s]); }
+
+            let kat = "", poc = "", poz = "";
+            const dily = t.split(/(počet|pozice|pozici)/);
+            let kontext = "kat";
             
-            // ZABIJÁK INTERPUNKCE: Odstraníme čárky, tečky a pomlčky, které Google dělá při pauzách
-            let text = rawText.replace(/[.,-]/g, " ");
-
-            // CHYTÁME NÁSOBKY NUL (např. "čtyři nuly", "4 nuly", "4 nula")
-            text = text.replace(/(čtyři|ctyri|4)\s*(nuly|nula|nul)/g, "0000");
-            text = text.replace(/(tři|tri|3)\s*(nuly|nula|nul)/g, "000");
-            text = text.replace(/(dvě|dve|2)\s*(nuly|nula|nul)/g, "00");
-            text = text.replace(/(pět|pet|5)\s*(nuly|nula|nul)/g, "00000");
-
-            // OSTATNÍ NULY (teď už to zvládne i nula mezeru nula mezeru nula...)
-            text = text.replace(/nula|nulu|nuly|nul/g, "0");
-
-            // OSTATNÍ ČÍSLA SLOVY
-            for (let slovo in cislaSlovy) {
-                text = text.replace(new RegExp(slovo, 'g'), cislaSlovy[slovo]);
-            }
-
-            let katalog = "", pocet = "", pozice = "";
-
-            // Rozdělení textu na části
-            const dily = text.split(/(počet|pozice|pozici)/);
-            let kontext = "katalog";
-            
-            dily.forEach(dil => {
-                let d = dil.trim();
-                if (d === "počet") { kontext = "počet"; return; }
-                if (d === "pozice" || d === "pozici") { kontext = "pozice"; return; }
-                
-                if (kontext === "katalog") katalog += d + " ";
-                if (kontext === "počet") pocet += d + " ";
-                if (kontext === "pozice") pozice += d + " ";
+            dily.forEach(d => {
+                let txt = d.trim();
+                if (txt === "počet") { kontext = "poc"; return; }
+                if (txt === "pozice" || txt === "pozici") { kontext = "poz"; return; }
+                if (kontext === "kat") kat += txt;
+                if (kontext === "poc") poc += txt;
+                if (kontext === "poz") poz += txt;
             });
 
-            // Čištění Katalogu (odstraní slovo katalog, spojí PN/LM a čísla k sobě, ignoruje už zničené čárky)
-            katalog = katalog.replace(/katalog/g, "").trim();
-            katalog = katalog.replace(/(pn|lm)\s*([\d\s]+)/gi, (m, p, n) => p + n.replace(/\s+/g, ''));
+            // KLÍČOVÁ OPRAVA: Odstraníme ÚPLNĚ VŠECHNY mezery z katalogového čísla
+            kat = kat.replace(/katalog/g, "").replace(/\s+/g, "").trim();
+            // Pokud tam zůstalo osamocené "pn" nebo "lm", zajistíme, aby bylo na začátku
+            if (kat.includes("pn") && !kat.startsWith("pn")) kat = "pn" + kat.replace("pn", "");
+            if (kat.includes("lm") && !kat.startsWith("lm")) kat = "lm" + kat.replace("lm", "");
             
-            // Čištění Počtu (jen číslice)
-            pocet = pocet.replace(/[^\d]/g, '');
-            pozice = pozice.trim();
+            poc = poc.replace(/[^\d]/g, '');
+            poz = poz.trim();
 
-            // LOGIKA DOPLŇOVÁNÍ / NOVÉHO ŘÁDKU
             const viditelne = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
             const posledni = viditelne[viditelne.length - 1];
 
-            if (posledni && !katalog.match(/pn|lm/i) && (pocet || pozice)) {
-                const tds = posledni.querySelectorAll('td');
-                if (pocet && !tds[1].innerText) tds[1].innerText = pocet;
-                if (pozice && !tds[2].innerText) tds[2].innerText = pozice;
+            if (posledni && !kat.match(/pn|lm/i) && (poc || poz)) {
+                if (poc && !posledni.cells[1].innerText) posledni.cells[1].innerText = poc;
+                if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
             } else {
-                pridejRadek(katalog, pocet, pozice);
+                pridejRadek(kat, poc, poz);
             }
-        };
-
-        rec.onerror = () => {
-            btnMic.classList.remove('active');
-            btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
-            debugText.innerText = "❌ Neslyšela jsem tě, zkus to znovu.";
         };
     }
 
     document.getElementById('btn-smazat').onclick = () => {
-        const viditelne = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
-        if (viditelne.length > 0) tbody.removeChild(viditelne[viditelne.length - 1]);
+        const v = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+        if (v.length > 0) tbody.removeChild(v[v.length - 1]);
     };
 
     document.getElementById('btn-export').onclick = () => {
         let csv = "\ufeffKatalog;Pocet;Pozice\n";
         tbody.querySelectorAll('tr').forEach(tr => {
-            const tds = tr.querySelectorAll('td');
-            csv += `${tds[0].innerText};${tds[1].innerText};${tds[2].innerText}\n`;
+            csv += `${tr.cells[0].innerText};${tr.cells[1].innerText};${tr.cells[2].innerText}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
