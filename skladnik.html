@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Profi</title>
+    <title>Skladník 2026 - Oprava Počtu</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 10px; margin: 0; }
         .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); max-width: 500px; margin: auto; }
@@ -13,7 +13,7 @@
         #btn-mic { background: #eb3b5a; }
         #btn-mic.active { background: #20bf6b; }
         .mrizka { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-        .mrizka button { padding: 12px 5px; font-size: 12px; margin-bottom: 0; }
+        .mrizka button { padding: 12px 5px; font-size: 11px; margin-bottom: 0; }
         #btn-smazat { background: #fa8231; }
         #btn-pridat { background: #4b6584; }
         #btn-export { background: #3867d6; }
@@ -62,15 +62,12 @@
     const fileInput = document.getElementById('file-input');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    // --- FUNKCE PRO UKLÁDÁNÍ DO PAMĚTI ---
+    const slovnik = { "sedum": "7", "osum": "8", "jedna": "1", "jeden": "1", "dvě": "2" };
+
     function autoUlozeni() {
         const data = [];
         tbody.querySelectorAll('tr').forEach(tr => {
-            data.push({
-                k: tr.cells[0].innerText,
-                p: tr.cells[1].innerText,
-                z: tr.cells[2].innerText
-            });
+            data.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText });
         });
         localStorage.setItem('skladnikData', JSON.stringify(data));
     }
@@ -78,8 +75,7 @@
     function nactiZPameti() {
         const ulozenaData = localStorage.getItem('skladnikData');
         if (ulozenaData) {
-            const data = JSON.parse(ulozenaData);
-            data.forEach(položka => pridejRadek(položka.k, položka.p, položka.z, false));
+            JSON.parse(ulozenaData).forEach(p => pridejRadek(p.k, p.p, p.z, false));
         }
     }
 
@@ -87,25 +83,16 @@
         if (!poz && filtr.value.trim() !== "") poz = filtr.value.trim();
         const radek = document.createElement('tr');
         radek.innerHTML = `<td contenteditable="true">${kat}</td><td contenteditable="true">${poc}</td><td contenteditable="true">${poz}</td>`;
-        
-        // Sledování změn v buňkách (když něco přepíšeš ručně)
-        radek.querySelectorAll('td').forEach(td => {
-            td.addEventListener('input', autoUlozeni);
-        });
-        
+        radek.querySelectorAll('td').forEach(td => td.addEventListener('input', autoUlozeni));
         tbody.appendChild(radek);
         if (ukladat) autoUlozeni();
         return radek;
     }
 
     function vymazatVse() {
-        if (confirm("Opravdu chceš smazat celou tabulku?")) {
-            tbody.innerHTML = "";
-            localStorage.removeItem('skladnikData');
-        }
+        if (confirm("Opravdu smazat všechna data?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); }
     }
 
-    // --- HLASOVÉ OVLÁDÁNÍ (Tvoje vyladěná verze) ---
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'cs-CZ';
@@ -118,29 +105,33 @@
             btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
             let t = raw.replace(/[.,-]/g, " ");
-            // Logika pro nuly
-            t = t.replace(/(5)\s*(nula|nul|nuly|0+)/g, "00000");
-            t = t.replace(/(4)\s*(nula|nul|nuly|0+)/g, "0000");
-            t = t.replace(/(3)\s*(nula|nul|nuly|0+)/g, "000");
-            t = t.replace(/(2)\s*(nula|nul|nuly|0+)/g, "00");
-            t = t.replace(/nula|nuly|nul/g, "0");
+            for (let s in slovnik) { t = t.replace(new RegExp(s, 'g'), slovnik[s]); }
 
-            let kat = "", poc = "", poz = "";
-            const dily = t.split(/(počet|počet kusů|pozice|pozici)/);
+            let rawKat = "", rawPoc = "", rawPoz = "";
+            const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
             let rezim = "kat";
 
             dily.forEach(dil => {
                 let d = dil.trim();
-                if (d.includes("počet")) { rezim = "poc"; return; }
-                if (d.includes("pozice") || d.includes("pozici")) { rezim = "poz"; return; }
-                if (rezim === "kat") kat += d;
-                if (rezim === "poc") poc += d;
-                if (rezim === "poz") poz += d;
+                if (d.match(/počet|kusů|kusy/)) { rezim = "poc"; return; }
+                if (d.match(/pozice|pozici/)) { rezim = "poz"; return; }
+                if (rezim === "kat") rawKat += d;
+                if (rezim === "poc") rawPoc += d;
+                if (rezim === "poz") rawPoz += d;
             });
 
+            // --- OPRAVA NUL POUZE PRO KATALOG ---
+            let kat = rawKat;
+            kat = kat.replace(/(5)\s*(nula|nul|nuly|0+)/g, "00000");
+            kat = kat.replace(/(4)\s*(nula|nul|nuly|0+)/g, "0000");
+            kat = kat.replace(/(3)\s*(nula|nul|nuly|0+)/g, "000");
+            kat = kat.replace(/(2)\s*(nula|nul|nuly|0+)/g, "00");
+            kat = kat.replace(/nula|nuly|nul/g, "0");
             kat = kat.replace(/katalog/g, "").replace(/\s+/g, "").trim();
-            poc = poc.replace(/[^\d]/g, '');
-            poz = poz.trim();
+
+            // --- POČET ZŮSTÁVÁ ČISTÝ ---
+            let poc = rawPoc.replace(/[^\d]/g, '').trim();
+            let poz = rawPoz.trim();
 
             const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
             const posledni = radky[radky.length - 1];
@@ -155,28 +146,19 @@
         };
     }
 
-    // --- IMPORT SOUBORU ---
     fileInput.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
-            const text = event.target.result;
-            const radky = text.split('\n');
-            radky.forEach((radek, index) => {
-                if (index === 0 || !radek.trim()) return; // Přeskočit hlavičku
-                const sloupce = radek.split(';');
-                if (sloupce.length >= 3) {
-                    pridejRadek(sloupce[0].replace(/"/g, ""), sloupce[1], sloupce[2].trim(), false);
-                }
+            event.target.result.split('\n').forEach((radek, i) => {
+                if (i === 0 || !radek.trim()) return;
+                const s = radek.split(';');
+                if (s.length >= 3) pridejRadek(s[0].replace(/"/g, ""), s[1].replace(/"/g, ""), s[2].replace(/"/g, "").trim(), false);
             });
             autoUlozeni();
-            alert("Soubor byl úspěšně nahrán!");
         };
-        reader.readAsText(file);
+        reader.readAsText(e.target.files[0]);
     };
 
-    // Ostatní obsluha
     document.getElementById('btn-smazat').onclick = () => {
         const v = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
         if (v.length > 0) { tbody.removeChild(v[v.length - 1]); autoUlozeni(); }
@@ -194,7 +176,6 @@
         a.download = 'sklad_inventura.csv'; a.click();
     };
 
-    // Spuštění při načtení
     window.onload = nactiZPameti;
 </script>
 </body>
