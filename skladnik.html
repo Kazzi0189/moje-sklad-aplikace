@@ -7,7 +7,8 @@
     <style>
         body { font-family: sans-serif; background: #f4f7f6; padding: 10px; margin: 0; }
         .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; font-size: 22px; margin-top: 0; }
+        h1 { text-align: center; color: #333; font-size: 22px; margin-top: 0; margin-bottom: 5px; }
+        #debug-text { font-size: 13px; color: #7f8c8d; text-align: center; margin-bottom: 15px; min-height: 18px; font-style: italic; }
         button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; }
         #btn-mic { background: #e74c3c; }
         #btn-mic.active { background: #2ecc71; }
@@ -27,6 +28,7 @@
 
 <div class="container">
     <h1>Skladník 📦</h1>
+    <div id="debug-text">Zde uvidíš, co přesně telefon slyšel...</div>
     <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
     <div class="tlacitka-pruh">
         <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
@@ -46,6 +48,7 @@
     const btnMic = document.getElementById('btn-mic');
     const tbody = document.querySelector('#tabulka tbody');
     const filtr = document.getElementById('filtr-pozice');
+    const debugText = document.getElementById('debug-text');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     const cislaSlovy = {
@@ -86,21 +89,23 @@
         btnMic.onclick = () => { rec.start(); btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
 
         rec.onresult = (event) => {
-            let text = event.results[0][0].transcript.toLowerCase();
-            btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
+            // Získáme surový text a hned ho ukážeme uživateli
+            let rawText = event.results[0][0].transcript.toLowerCase();
+            debugText.innerText = '🤖 Slyšel jsem: "' + rawText + '"';
+            
+            // ZABIJÁK INTERPUNKCE: Odstraníme čárky, tečky a pomlčky, které Google dělá při pauzách
+            let text = rawText.replace(/[.,-]/g, " ");
 
-            // 1. NEJDŘÍV CHYTÁME NÁSOBKY NUL (např. "čtyři nuly" -> "0000")
-            // Zahrnuje to i variantu, kdy by Google přeložil "čtyři" rovnou na "4 nuly"
-            text = text.replace(/(dvě|dve|2)\s*nuly/g, "00");
-            text = text.replace(/(tři|tri|3)\s*nuly/g, "000");
-            text = text.replace(/(čtyři|ctyri|4)\s*nuly/g, "0000");
-            text = text.replace(/(pět|pet|5)\s*nul/g, "00000");
-            text = text.replace(/(šest|sest|6)\s*nul/g, "000000");
+            // CHYTÁME NÁSOBKY NUL (např. "čtyři nuly", "4 nuly", "4 nula")
+            text = text.replace(/(čtyři|ctyri|4)\s*(nuly|nula|nul)/g, "0000");
+            text = text.replace(/(tři|tri|3)\s*(nuly|nula|nul)/g, "000");
+            text = text.replace(/(dvě|dve|2)\s*(nuly|nula|nul)/g, "00");
+            text = text.replace(/(pět|pet|5)\s*(nuly|nula|nul)/g, "00000");
 
-            // 2. POTÉ CHYTÁME VŠECHNY ZBÝVAJÍCÍ NULY (vyřeší to i 4x řečené "nula nula nula nula")
+            // OSTATNÍ NULY (teď už to zvládne i nula mezeru nula mezeru nula...)
             text = text.replace(/nula|nulu|nuly|nul/g, "0");
 
-            // 3. AŽ NAKONEC PŘEVÁDÍME OSTATNÍ SLOVA NA ČÍSLA
+            // OSTATNÍ ČÍSLA SLOVY
             for (let slovo in cislaSlovy) {
                 text = text.replace(new RegExp(slovo, 'g'), cislaSlovy[slovo]);
             }
@@ -121,7 +126,7 @@
                 if (kontext === "pozice") pozice += d + " ";
             });
 
-            // Čištění Katalogu (PN/LM a slepení čísel - odstraní mezery)
+            // Čištění Katalogu (odstraní slovo katalog, spojí PN/LM a čísla k sobě, ignoruje už zničené čárky)
             katalog = katalog.replace(/katalog/g, "").trim();
             katalog = katalog.replace(/(pn|lm)\s*([\d\s]+)/gi, (m, p, n) => p + n.replace(/\s+/g, ''));
             
@@ -145,6 +150,7 @@
         rec.onerror = () => {
             btnMic.classList.remove('active');
             btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
+            debugText.innerText = "❌ Neslyšela jsem tě, zkus to znovu.";
         };
     }
 
