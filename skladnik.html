@@ -3,42 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026</title>
+    <title>Skladník 2026 - Profi</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 10px; margin: 0; }
         .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); max-width: 500px; margin: auto; }
         h1 { text-align: center; color: #1a1a1a; margin-bottom: 5px; }
-        #debug-text { font-size: 12px; color: #65676b; text-align: center; margin-bottom: 15px; padding: 5px; background: #f8f9fa; border-radius: 5px; border: 1px dashed #ccc; }
-        button { width: 100%; padding: 16px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
-        #btn-mic { background: #eb3b5a; color: white; }
-        #btn-mic.active { background: #20bf6b; transform: scale(0.98); }
-        .pruh { display: flex; gap: 8px; margin-bottom: 10px; }
-        .pruh button { flex: 1; font-size: 12px; padding: 12px 5px; color: white; }
+        #debug-text { font-size: 12px; color: #65676b; text-align: center; margin-bottom: 10px; padding: 5px; background: #f8f9fa; border-radius: 5px; border: 1px dashed #ccc; min-height: 15px;}
+        button { width: 100%; padding: 16px; margin-bottom: 8px; font-size: 15px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; }
+        #btn-mic { background: #eb3b5a; }
+        #btn-mic.active { background: #20bf6b; }
+        .mrizka { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .mrizka button { padding: 12px 5px; font-size: 12px; margin-bottom: 0; }
         #btn-smazat { background: #fa8231; }
         #btn-pridat { background: #4b6584; }
         #btn-export { background: #3867d6; }
-        #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 2px solid #3867d6; border-radius: 8px; font-size: 16px; }
-        table { width: 100%; border-collapse: collapse; background: white; }
+        #btn-import { background: #8854d0; }
+        #btn-clear-all { background: #4b4b4b; grid-column: span 2; }
+        #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 10px; box-sizing: border-box; border: 2px solid #3867d6; border-radius: 8px; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f1f2f6; }
-        tr:nth-child(even) { background: #fafafa; }
-        td[contenteditable="true"] { background: #fff9c4; font-weight: bold; }
+        td[contenteditable="true"] { background: #fff9c4; }
+        #file-input { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Skladník 📦</h1>
-    <div id="debug-text">Zde uvidíš, co Google zachytil...</div>
+    <div id="debug-text">Data se automaticky ukládají...</div>
     
     <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
     
-    <div class="pruh">
-        <button id="btn-smazat">🗑️ SMAZAT</button>
-        <button id="btn-pridat">➕ RUČNĚ</button>
-        <button id="btn-export">💾 EXCEL</button>
+    <div class="mrizka">
+        <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
+        <button id="btn-pridat">➕ PŘIDAT RUČNĚ</button>
+        <button id="btn-export">💾 ULOŽIT EXCEL</button>
+        <button id="btn-import" onclick="document.getElementById('file-input').click()">📂 NAHRÁT EXCEL</button>
+        <button id="btn-clear-all" onclick="vymazatVse()">🧨 VYMAZAT CELOU TABULKU</button>
     </div>
 
+    <input type="file" id="file-input" accept=".csv">
     <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici (např. C2)...">
 
     <table id="tabulka">
@@ -54,27 +59,57 @@
     const debugText = document.getElementById('debug-text');
     const tbody = document.querySelector('#tabulka tbody');
     const filtr = document.getElementById('filtr-pozice');
+    const fileInput = document.getElementById('file-input');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    const slovnik = {
-        "sedum": "7", "osum": "8", "jedna": "1", "jeden": "1", "dva": "2", "dvě": "2", "tři": "3", 
-        "čtyři": "4", "pět": "5", "šest": "6", "sedm": "7", "osm": "8", "devět": "9", "deset": "10",
-        "čtyřikrát": "4", "třikrát": "3", "dvakrát": "2", "pětkrát": "5"
-    };
+    // --- FUNKCE PRO UKLÁDÁNÍ DO PAMĚTI ---
+    function autoUlozeni() {
+        const data = [];
+        tbody.querySelectorAll('tr').forEach(tr => {
+            data.push({
+                k: tr.cells[0].innerText,
+                p: tr.cells[1].innerText,
+                z: tr.cells[2].innerText
+            });
+        });
+        localStorage.setItem('skladnikData', JSON.stringify(data));
+    }
 
-    function pridejRadek(kat = "", poc = "", poz = "") {
+    function nactiZPameti() {
+        const ulozenaData = localStorage.getItem('skladnikData');
+        if (ulozenaData) {
+            const data = JSON.parse(ulozenaData);
+            data.forEach(položka => pridejRadek(položka.k, položka.p, položka.z, false));
+        }
+    }
+
+    function pridejRadek(kat = "", poc = "", poz = "", ukladat = true) {
         if (!poz && filtr.value.trim() !== "") poz = filtr.value.trim();
         const radek = document.createElement('tr');
         radek.innerHTML = `<td contenteditable="true">${kat}</td><td contenteditable="true">${poc}</td><td contenteditable="true">${poz}</td>`;
+        
+        // Sledování změn v buňkách (když něco přepíšeš ručně)
+        radek.querySelectorAll('td').forEach(td => {
+            td.addEventListener('input', autoUlozeni);
+        });
+        
         tbody.appendChild(radek);
+        if (ukladat) autoUlozeni();
         return radek;
     }
 
+    function vymazatVse() {
+        if (confirm("Opravdu chceš smazat celou tabulku?")) {
+            tbody.innerHTML = "";
+            localStorage.removeItem('skladnikData');
+        }
+    }
+
+    // --- HLASOVÉ OVLÁDÁNÍ (Tvoje vyladěná verze) ---
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'cs-CZ';
-        rec.interimResults = false;
-
+        
         btnMic.onclick = () => { rec.start(); btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
 
         rec.onresult = (event) => {
@@ -82,23 +117,14 @@
             debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
             btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
-            // 1. Základní čištění
             let t = raw.replace(/[.,-]/g, " ");
-
-            // 2. Oprava slovní výslovnosti čísel
-            for (let slovo in slovnik) {
-                t = t.replace(new RegExp(slovo, 'g'), slovnik[slovo]);
-            }
-
-            // 3. MAGICKÁ OPRAVA NUL (i když Google napíše jen "4 0" nebo "4 00")
-            // Pokud najde číslici 2-5 následovanou nulou nebo slovem nula, nahradí ji správným počtem nul
+            // Logika pro nuly
             t = t.replace(/(5)\s*(nula|nul|nuly|0+)/g, "00000");
             t = t.replace(/(4)\s*(nula|nul|nuly|0+)/g, "0000");
             t = t.replace(/(3)\s*(nula|nul|nuly|0+)/g, "000");
             t = t.replace(/(2)\s*(nula|nul|nuly|0+)/g, "00");
             t = t.replace(/nula|nuly|nul/g, "0");
 
-            // 4. Rozdělení na části
             let kat = "", poc = "", poz = "";
             const dily = t.split(/(počet|počet kusů|pozice|pozici)/);
             let rezim = "kat";
@@ -112,28 +138,48 @@
                 if (rezim === "poz") poz += d;
             });
 
-            // 5. Finální vyčištění katalogu (slepíme vše k sobě a vymažeme slovo katalog)
             kat = kat.replace(/katalog/g, "").replace(/\s+/g, "").trim();
-            poc = poc.replace(/[^\d]/g, ''); // v počtu jen čísla
+            poc = poc.replace(/[^\d]/g, '');
             poz = poz.trim();
 
-            // 6. Zápis do tabulky
             const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
             const posledni = radky[radky.length - 1];
 
             if (posledni && !kat.match(/pn|lm/i) && (poc || poz)) {
                 if (poc && !posledni.cells[1].innerText) posledni.cells[1].innerText = poc;
                 if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
+                autoUlozeni();
             } else {
                 if (kat || poc || poz) pridejRadek(kat, poc, poz);
             }
         };
     }
 
-    // Ostatní funkce (Export, Smazat, Filtr) zůstávají stejné...
+    // --- IMPORT SOUBORU ---
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target.result;
+            const radky = text.split('\n');
+            radky.forEach((radek, index) => {
+                if (index === 0 || !radek.trim()) return; // Přeskočit hlavičku
+                const sloupce = radek.split(';');
+                if (sloupce.length >= 3) {
+                    pridejRadek(sloupce[0].replace(/"/g, ""), sloupce[1], sloupce[2].trim(), false);
+                }
+            });
+            autoUlozeni();
+            alert("Soubor byl úspěšně nahrán!");
+        };
+        reader.readAsText(file);
+    };
+
+    // Ostatní obsluha
     document.getElementById('btn-smazat').onclick = () => {
         const v = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
-        if (v.length > 0) tbody.removeChild(v[v.length - 1]);
+        if (v.length > 0) { tbody.removeChild(v[v.length - 1]); autoUlozeni(); }
     };
     document.getElementById('btn-pridat').onclick = () => pridejRadek();
     filtr.oninput = () => {
@@ -142,11 +188,14 @@
     };
     document.getElementById('btn-export').onclick = () => {
         let csv = "\ufeffKatalog;Počet;Pozice\n";
-        tbody.querySelectorAll('tr').forEach(tr => csv += `${tr.cells[0].innerText};${tr.cells[1].innerText};${tr.cells[2].innerText}\n`);
+        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}"\n`);
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        a.download = 'sklad.csv'; a.click();
+        a.download = 'sklad_inventura.csv'; a.click();
     };
+
+    // Spuštění při načtení
+    window.onload = nactiZPameti;
 </script>
 </body>
 </html>
