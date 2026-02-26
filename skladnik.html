@@ -3,28 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Kompletní verze</title>
+    <title>Skladník 2026 - Sticky verze</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 10px; margin: 0; }
-        .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); max-width: 500px; margin: auto; }
-        h1 { text-align: center; color: #1a1a1a; margin-bottom: 5px; }
-        #status-bar { font-size: 11px; text-align: center; margin-bottom: 10px; padding: 5px; background: #e3f2fd; border-radius: 5px; color: #1976d2; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; }
+        
+        /* --- STICKY SEKCE --- */
+        .header-sticky {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 15px 5px 15px;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-bottom: 1px solid #ddd;
+        }
+
+        .container { max-width: 500px; margin: auto; padding: 0 10px 20px 10px; }
+        
+        h1 { text-align: center; color: #1a1a1a; margin: 0 0 5px 0; font-size: 22px; }
+        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; padding: 4px; background: #e3f2fd; border-radius: 5px; color: #1976d2; }
         #debug-text { font-size: 12px; color: #65676b; text-align: center; margin-bottom: 10px; font-style: italic; min-height: 15px; }
+        
         button { width: 100%; padding: 16px; margin-bottom: 8px; font-size: 14px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
         #btn-mic { background: #eb3b5a; font-size: 18px; }
         #btn-mic.active { background: #20bf6b; }
-        .mrizka { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-        .mrizka button { padding: 12px 5px; font-size: 11px; margin-bottom: 0; }
+        
+        .mrizka { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+        .mrizka button { padding: 10px 5px; font-size: 10px; margin-bottom: 0; }
+        
         #btn-smazat { background: #fa8231; }
         #btn-pridat { background: #4b6584; }
         #btn-export { background: #3867d6; }
         #btn-import-list { background: #20bf6b; grid-column: span 2; }
         #btn-import-work { background: #8854d0; grid-column: span 2; }
-        #btn-clear-all { background: #4b4b4b; grid-column: span 2; }
-        #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 10px; box-sizing: border-box; border: 2px solid #3867d6; border-radius: 8px; font-size: 16px; }
+        #btn-clear-all { background: #4b4b4b; grid-column: span 2; padding: 8px; font-size: 9px; opacity: 0.8; }
+        
+        #filtr-pozice { width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 2px solid #3867d6; border-radius: 8px; font-size: 16px; }
+
+        /* --- TABULKA --- */
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #f1f2f6; }
+        th { position: sticky; top: 320px; /* Přibližná výška headeru - doladí se dynamicky */
+             background: #f1f2f6; border: 1px solid #ddd; padding: 10px; text-align: left; z-index: 900; }
+        td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         tr:nth-child(even) { background: #f9f9f9; }
         td[contenteditable="true"] { background: #fff9c4; font-weight: bold; }
         input[type="file"] { display: none; }
@@ -32,29 +52,27 @@
 </head>
 <body>
 
-<div class="container">
-    <h1>Skladník 📦</h1>
-    <div id="status-bar">Načítání...</div>
-    <div id="debug-text">Slyšeno: -</div>
-    
-    <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
-    
-    <div class="mrizka">
-        <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
-        <button id="btn-pridat">➕ PŘIDAT RUČNĚ</button>
+<div class="header-sticky">
+    <div style="max-width: 500px; margin: auto;">
+        <h1>Skladník 📦</h1>
+        <div id="status-bar">Načítání...</div>
+        <div id="debug-text">Slyšeno: -</div>
         
-        <button id="btn-import-list" onclick="document.getElementById('list-input').click()">📖 NAHRÁT SEZNAM ARTIKLŮ (CSV)</button>
-        <button id="btn-import-work" onclick="document.getElementById('work-input').click()">📂 POKRAČOVAT V INVENTUŘE (CSV)</button>
+        <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
         
-        <button id="btn-export">💾 ULOŽIT INVENTURU</button>
-        <button id="btn-clear-all" onclick="vymazatVse()">🧨 VYMAZAT TABULKU</button>
+        <div class="mrizka">
+            <button id="btn-smazat">🗑️ SMAZAT POSLEDNÍ</button>
+            <button id="btn-pridat">➕ PŘIDAT RUČNĚ</button>
+            <button id="btn-import-list" onclick="document.getElementById('list-input').click()">📖 NAHRÁT SEZNAM ARTIKLŮ</button>
+            <button id="btn-import-work" onclick="document.getElementById('work-input').click()">📂 POKRAČOVAT V INVENTUŘE</button>
+            <button id="btn-export">💾 ULOŽIT INVENTURU</button>
+            <button id="btn-clear-all" onclick="vymazatVse()">🧨 VYMAZAT TABULKU</button>
+        </div>
+        <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici (např. C2)...">
     </div>
+</div>
 
-    <input type="file" id="list-input" accept=".csv">
-    <input type="file" id="work-input" accept=".csv">
-
-    <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici (např. C2)...">
-
+<div class="container">
     <table id="tabulka">
         <thead>
             <tr><th>Katalog</th><th>Počet</th><th>Pozice</th></tr>
@@ -62,6 +80,9 @@
         <tbody></tbody>
     </table>
 </div>
+
+<input type="file" id="list-input" accept=".csv">
+<input type="file" id="work-input" accept=".csv">
 
 <script>
     const btnMic = document.getElementById('btn-mic');
@@ -79,27 +100,18 @@
         statusBar.innerText = `📦 Artiklů v databázi: ${seznamArtiklu.length} | 💾 Auto-ukládání aktivní`;
     }
 
-    // --- CHYTRÉ VYHLEDÁVÁNÍ V SEZNAMU ---
     function najdiNejlepsiShodu(text) {
         if (!text || seznamArtiklu.length === 0) return text;
         let hledany = text.replace(/\s+/g, '').toLowerCase();
-        
-        // 1. Zkusíme shodu bez mezer a znaků
         let shoda = seznamArtiklu.find(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
         if (shoda) return shoda;
-
-        // 2. Částečná shoda
         shoda = seznamArtiklu.find(a => a.toLowerCase().includes(hledany));
-        if (shoda) return shoda;
-
-        return text;
+        return shoda || text;
     }
 
-    // --- HLASOVÉ OVLÁDÁNÍ ---
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'cs-CZ';
-        
         btnMic.onclick = () => { rec.start(); btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
 
         rec.onresult = (event) => {
@@ -142,12 +154,14 @@
                 if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
                 autoUlozeni();
             } else {
-                if (kat || poc || poz) pridejRadek(kat, poc, poz);
+                if (kat || poc || poz) {
+                    pridejRadek(kat, poc, poz);
+                    window.scrollTo(0, document.body.scrollHeight); // Automaticky sjet k novému záznamu
+                }
             }
         };
     }
 
-    // --- NAHRÁVÁNÍ SEZNAMU ARTIKLŮ (Sortiment) ---
     listInput.onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -160,36 +174,25 @@
             seznamArtiklu = noveKody;
             localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
             aktualizujStatus();
-            alert(`Úspěšně nahráno ${noveKody.length} kódů artiklů!`);
+            alert(`Nahráno ${noveKody.length} kódů!`);
         };
         reader.readAsText(e.target.files[0]);
     };
 
-    // --- NAHRÁVÁNÍ ROZDĚLANÉ INVENTURY ---
     workInput.onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (event) => {
-            const text = event.target.result;
-            const radky = text.split('\n');
-            radky.forEach((radek, index) => {
+            event.target.result.split('\n').forEach((radek, index) => {
                 if (index === 0 || !radek.trim()) return;
                 const sloupce = radek.split(';');
-                if (sloupce.length >= 3) {
-                    pridejRadek(
-                        sloupce[0].replace(/"/g, ""), 
-                        sloupce[1].replace(/"/g, ""), 
-                        sloupce[2].replace(/"/g, "").trim(), 
-                        false
-                    );
-                }
+                if (sloupce.length >= 3) pridejRadek(sloupce[0].replace(/"/g, ""), sloupce[1].replace(/"/g, ""), sloupce[2].replace(/"/g, "").trim(), false);
             });
             autoUlozeni();
-            alert("Inventura byla úspěšně načtena!");
+            alert("Inventura načtena!");
         };
         reader.readAsText(e.target.files[0]);
     };
 
-    // --- POMOCNÉ FUNKCE ---
     function autoUlozeni() {
         const data = [];
         tbody.querySelectorAll('tr').forEach(tr => {
@@ -215,7 +218,7 @@
     }
 
     function vymazatVse() {
-        if (confirm("Smazat celou tabulku?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); }
+        if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); }
     }
 
     document.getElementById('btn-smazat').onclick = () => {
