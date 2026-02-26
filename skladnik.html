@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Full Pro</title>
+    <title>Skladník 2026 - Stabilní Profi</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -13,38 +13,29 @@
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
         h1 { text-align: center; margin: 5px 0; font-size: 20px; }
-        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: var(--primary); font-weight: bold; line-height: 1.4; }
+        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: var(--primary); font-weight: bold; }
+        #debug-text { font-size: 12px; color: #777; text-align: center; margin-bottom: 5px; font-style: italic; min-height: 15px; }
         
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         .hlavni-akce { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         #btn-mic { padding: 18px; background: var(--danger); font-size: 18px; }
         #btn-scan { padding: 18px; background: #2d3436; font-size: 18px; }
-        #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); }
+        #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); border: 2px solid white; }
 
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 9px; }
         
-        #btn-import-artikl { background: #4b6584; }
-        #btn-import-barcode { background: #00b894; }
-        #btn-import-work { background: var(--secondary); }
-        #btn-clear-all { background: #4b4b4b; grid-column: 1 / -1; font-size: 10px; padding: 6px; opacity: 0.9; }
-
         .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .filtry input { padding: 10px; border: 2px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
-        /* TABULKA */
         .table-container { width: 100%; max-width: 1200px; padding: 0 15px 40px 15px; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border-color); }
         thead { position: sticky; z-index: 1500; }
         th { position: sticky; top: 0; background: #e9ecef; padding: 12px 5px; text-align: left; cursor: pointer; border: 1px solid var(--border-color); font-size: 13px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); }
         td { border: 1px solid var(--border-color); padding: 10px 8px; font-size: 15px; }
         
-        th:nth-child(1), td:nth-child(1) { width: 45%; }
-        th:nth-child(2), td:nth-child(2) { width: 20%; text-align: center; }
-        th:nth-child(3), td:nth-child(3) { width: 35%; }
-
         tr:nth-child(even) { background: #f2f2f2; }
         td[contenteditable="true"] { background: #fffde7; outline: 1px solid var(--primary); }
         input[type="file"] { display: none; }
@@ -56,6 +47,7 @@
     <div class="header-content">
         <h1>Skladník 2026 📦</h1>
         <div id="status-bar">Načítání...</div>
+        <div id="debug-text">Slyšeno: -</div>
         <div id="reader"></div>
 
         <div class="hlavni-akce">
@@ -64,12 +56,12 @@
         </div>
         
         <div class="mrizka">
-            <button id="btn-import-artikl" onclick="document.getElementById('artikl-input').click()">📖 NAHRÁT KATALOG (ARTIKL)</button>
-            <button id="btn-import-barcode" onclick="document.getElementById('barcode-input').click()">🏷️ NAHRÁT EAN DATABÁZI</button>
-            <button id="btn-import-work" onclick="document.getElementById('work-input').click()">📂 NAHRÁT ROZDĚLANÉ</button>
+            <button id="btn-import-artikl" style="background:#4b6584" onclick="document.getElementById('artikl-input').click()">📖 NAHRÁT ARTIKLY</button>
+            <button id="btn-import-barcode" style="background:#00b894" onclick="document.getElementById('barcode-input').click()">🏷️ NAHRÁT EANy</button>
+            <button id="btn-import-work" style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 NAHRÁT ROZDĚLANÉ</button>
             <button id="btn-smazat" style="background:#fa8231">🗑️ SMAZAT POSLEDNÍ</button>
             <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT EXCEL</button>
-            <button id="btn-clear-all" onclick="vymazatVse()">🧨 VYMAZAT CELOU TABULKU</button>
+            <button id="btn-clear-all" style="background:#4b4b4b; grid-column: 1/-1;" onclick="vymazatVse()">🧨 VYMAZAT CELOU TABULKU</button>
         </div>
 
         <div class="filtry">
@@ -99,10 +91,13 @@
 <script>
     const tbody = document.querySelector('#tabulka tbody');
     const statusBar = document.getElementById('status-bar');
+    const debugText = document.getElementById('debug-text');
     const fPoz = document.getElementById('filtr-poz');
+    const btnMic = document.getElementById('btn-mic');
     
     let barcodeMap = JSON.parse(localStorage.getItem('barcodeMap')) || {};
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
+    let smerRazeni = [true, true, true];
     let scannerActive = false;
     let html5QrCode;
 
@@ -112,11 +107,67 @@
     }
 
     function aktualizujStatus() {
-        statusBar.innerHTML = `Artiklů: ${seznamArtiklu.length} | EANů: ${Object.keys(barcodeMap).length}<br>Auto-ukládání: AKTIVNÍ`;
+        statusBar.innerHTML = `Artiklů: ${seznamArtiklu.length} | EANů: ${Object.keys(barcodeMap).length}`;
         updateTableStickyPos();
     }
 
-    // --- SKENER S DOTAZY ---
+    // --- HLASOVÉ OVLÁDÁNÍ ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'cs-CZ';
+        recognition.continuous = false;
+
+        btnMic.onclick = () => startListening();
+
+        recognition.onstart = () => btnMic.classList.add('active');
+        recognition.onend = () => btnMic.classList.remove('active');
+
+        recognition.onresult = (event) => {
+            const raw = event.results[0][0].transcript.toLowerCase();
+            debugText.innerText = 'Slyšeno: ' + raw;
+            zpracujHlas(raw);
+        };
+    }
+
+    function startListening() {
+        if (recognition) recognition.start();
+    }
+
+    function zpracujHlas(text) {
+        let t = text.replace(/lomeno/g, "/").replace(/pomlčka|mínus/g, "-");
+        let rKat = "", rPoc = "", rPoz = "";
+        const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
+        let rezim = "kat";
+
+        dily.forEach(d => {
+            let s = d.trim();
+            if (s.match(/počet|kusů|kusy/)) { rezim = "poc"; return; }
+            if (s.match(/pozice|pozici/)) { rezim = "poz"; return; }
+            if (rezim === "kat") rKat += s;
+            if (rezim === "poc") rPoc += s;
+            if (rezim === "poz") rPoz += s;
+        });
+
+        let kat = rKat.replace(/\s+/g, "").toUpperCase();
+        // Chytrá oprava katalogu
+        if (seznamArtiklu.length > 0) {
+            let shoda = seznamArtiklu.find(a => a.toUpperCase().replace(/[^A-Z0-9]/g,'') === kat.replace(/[^A-Z0-9]/g,''));
+            if (shoda) kat = shoda;
+        }
+
+        let poc = rPoc.replace(/[^\d]/g, '');
+        let poz = rPoz.trim() || fPoz.value;
+
+        if (kat || poc || poz) {
+            pridejRadek(kat, poc, poz);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    }
+
+    // --- SKENER ---
     document.getElementById('btn-scan').onclick = () => {
         const readerDiv = document.getElementById('reader');
         if (!scannerActive) {
@@ -126,18 +177,16 @@
             html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: { width: 250, height: 150 } }, (decodedText) => {
                 const nalezenyKatalog = barcodeMap[decodedText];
                 if (nalezenyKatalog) {
-                    vibrace();
+                    if (navigator.vibrate) navigator.vibrate(100);
                     stopScanner();
-                    
-                    // DOTAZY PO SKENOVÁNÍ
+                    // Automaticky spustí hlas pro počet a pozici
                     setTimeout(() => {
-                        let pocet = prompt(`Naskenováno: ${nalezenyKatalog}\nZadej počet:`, "");
-                        let pozice = prompt(`Zadej pozici:`, fPoz.value || "");
-                        pridejRadek(nalezenyKatalog, pocet, pozice);
-                        window.scrollTo(0, document.body.scrollHeight);
-                    }, 300);
+                        pridejRadek(nalezenyKatalog, "", "");
+                        debugText.innerText = "Naskenováno! Teď řekněte počet a pozici...";
+                        startListening();
+                    }, 500);
                 } else {
-                    alert("EAN " + decodedText + " není v databázi!");
+                    alert("EAN " + decodedText + " neznám!");
                     stopScanner();
                 }
             }).catch(err => console.error(err));
@@ -155,7 +204,52 @@
         }
     }
 
-    function vibrace() { if (navigator.vibrate) navigator.vibrate(100); }
+    // --- TABULKA & FUNKCE ---
+    function pridejRadek(k="", p="", z="", u=true) {
+        // Pokud přidáváme prázdný a poslední řádek je taky prázdný, neřešíme
+        const r = document.createElement('tr');
+        r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
+        r.querySelectorAll('td').forEach(td => td.addEventListener('input', autoUlozeni));
+        tbody.appendChild(r);
+        if (u) autoUlozeni();
+    }
+
+    function serad(sloupec, typ) {
+        const radky = Array.from(tbody.querySelectorAll('tr'));
+        const asc = smerRazeni[sloupec];
+        radky.sort((a, b) => {
+            let vA = a.cells[sloupec].innerText.trim();
+            let vB = b.cells[sloupec].innerText.trim();
+            if (typ === 'number') return asc ? parseFloat(vA||0) - parseFloat(vB||0) : parseFloat(vB||0) - parseFloat(vA||0);
+            return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        });
+        radky.forEach(r => tbody.appendChild(r));
+        smerRazeni[sloupec] = !asc;
+    }
+
+    function autoUlozeni() {
+        const d = [];
+        tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText }));
+        localStorage.setItem('skladnikData', JSON.stringify(d));
+    }
+
+    function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    
+    document.getElementById('btn-smazat').onclick = () => {
+        if (tbody.lastElementChild) { tbody.removeChild(tbody.lastElementChild); autoUlozeni(); }
+    };
+
+    // --- EXPORT S VLASTNÍM NÁZVEM ---
+    document.getElementById('btn-export').onclick = () => {
+        let nazev = prompt("Zadejte název souboru:", "inventura_" + new Date().toLocaleDateString());
+        if (!nazev) return;
+        let csv = "\ufeffKatalog;Počet;Pozice\n";
+        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}"\n`);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        a.download = nazev + ".csv";
+        a.click();
+    };
 
     // --- IMPORTY ---
     document.getElementById('artikl-input').onchange = (e) => {
@@ -164,7 +258,6 @@
             seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].split(',')[0].replace(/"/g, '').trim()).filter(c => c && c !== "Katalog");
             localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
             aktualizujStatus();
-            alert("Katalog artiklů nahrán!");
         };
         reader.readAsText(e.target.files[0]);
     };
@@ -172,60 +265,29 @@
     document.getElementById('barcode-input').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            const novaMapa = {};
+            const m = {};
             ev.target.result.split('\n').forEach(r => {
                 const s = r.split(';');
-                if (s.length >= 2) {
-                    const ean = s[0].trim();
-                    const kat = s[1].trim();
-                    if (ean && kat && kat !== "Katalog") novaMapa[ean] = kat;
-                }
+                if (s.length >= 2) m[s[0].trim()] = s[1].trim();
             });
-            barcodeMap = novaMapa;
-            localStorage.setItem('barcodeMap', JSON.stringify(barcodeMap));
+            barcodeMap = m;
+            localStorage.setItem('barcodeMap', JSON.stringify(m));
             aktualizujStatus();
-            alert("EAN databáze nahrána!");
         };
         reader.readAsText(e.target.files[0]);
     };
 
-    // --- ZÁKLADNÍ FUNKCE ---
-    function pridejRadek(k="", p="", z="", u=true) {
-        const r = document.createElement('tr');
-        r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
-        r.querySelectorAll('td').forEach(td => td.addEventListener('input', autoUlozeni));
-        tbody.appendChild(r);
-        if (u) autoUlozeni();
-        return r;
-    }
-
-    function vymazatVse() { if (confirm("Opravdu smazat celou tabulku?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
-    
-    document.getElementById('btn-smazat').onclick = () => {
-        const v = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
-        if (v.length > 0) { tbody.removeChild(v[v.length - 1]); autoUlozeni(); }
-    };
-
-    function autoUlozeni() {
-        const d = [];
-        tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText }));
-        localStorage.setItem('skladnikData', JSON.stringify(d));
-    }
-
-    // --- FILTRY & ŘAZENÍ ---
-    document.getElementById('filtr-kat').oninput = document.getElementById('filtr-poz').oninput = () => {
-        const vK = document.getElementById('filtr-kat').value.toLowerCase();
-        const vP = document.getElementById('filtr-poz').value.toLowerCase();
-        tbody.querySelectorAll('tr').forEach(r => {
-            r.style.display = (r.cells[0].innerText.toLowerCase().includes(vK) && r.cells[2].innerText.toLowerCase().includes(vP)) ? '' : 'none';
-        });
-    };
-
-    document.getElementById('btn-export').onclick = () => {
-        let csv = "\ufeffKatalog;Počet;Pozice\n";
-        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}"\n`);
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        a.download = 'inventura.csv'; a.click();
+    document.getElementById('work-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            ev.target.result.split('\n').forEach((r, i) => {
+                if (i === 0 || !r.trim()) return;
+                const s = r.split(';');
+                if (s.length >= 3) pridejRadek(s[0].replace(/"/g, ""), s[1].replace(/"/g, ""), s[2].replace(/"/g, ""), false);
+            });
+            autoUlozeni();
+        };
+        reader.readAsText(e.target.files[0]);
     };
 
     window.onload = () => {
