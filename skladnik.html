@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Tablet Pro</title>
+    <title>Skladník 2026 - Profi Tablet</title>
     <style>
-        :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; }
+        :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* HEADER - Přizpůsobí se šířce */
+        /* HEADER */
         .header-sticky {
             position: sticky; top: 0; background: white; width: 100%;
             padding: 10px 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -21,7 +21,6 @@
         
         /* TLAČÍTKA */
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: opacity 0.2s; }
-        button:active { opacity: 0.7; }
         #btn-mic { width: 100%; padding: 18px; background: var(--danger); font-size: 18px; margin-bottom: 10px; }
         #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); }
         
@@ -37,22 +36,28 @@
         /* FILTRY */
         .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
         .filtry input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; width: 100%; box-sizing: border-box; }
-        .filtry input:focus { border-color: var(--primary); outline: none; }
 
-        /* TABULKA */
+        /* TABULKA SE SVISLÝMI ČARAMI */
         .table-container { width: 100%; max-width: 1200px; padding: 0 15px 40px 15px; box-sizing: border-box; }
-        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; border: 2px solid var(--border-color); }
+        
         th { 
-            position: sticky; top: 0; /* Pro vnitřní scroll, ale v našem sticky headeru funguje jinak */
-            background: #f1f2f6; padding: 14px 10px; text-align: left; cursor: pointer; 
-            user-select: none; border-bottom: 2px solid #ddd; font-size: 14px;
+            position: sticky; top: 0; background: #e9ecef; 
+            padding: 14px 10px; text-align: left; cursor: pointer; 
+            border: 1px solid var(--border-color); font-size: 14px; font-weight: 800;
         }
-        th:hover { background: #e2e4e9; }
-        th::after { content: ' ↕'; opacity: 0.3; font-size: 10px; }
-        td { border-bottom: 1px solid #eee; padding: 12px 10px; font-size: 15px; }
-        tr:last-child td { border-bottom: none; }
-        tr:nth-child(even) { background: #fafafa; }
-        td[contenteditable="true"] { background: #fffde7; outline: none; border-bottom: 2px solid #ffe57f; }
+        td { 
+            border: 1px solid var(--border-color); /* TADY JSOU TY SVISLÉ ČÁRY */
+            padding: 12px 10px; font-size: 15px; 
+        }
+        
+        /* Nastavení šířky sloupců */
+        th:nth-child(1), td:nth-child(1) { width: 50%; }
+        th:nth-child(2), td:nth-child(2) { width: 20%; text-align: center; }
+        th:nth-child(3), td:nth-child(3) { width: 30%; }
+
+        tr:nth-child(even) { background: #f2f2f2; }
+        td[contenteditable="true"] { background: #fffde7; outline: 2px solid var(--primary); }
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -86,9 +91,9 @@
     <table id="tabulka">
         <thead>
             <tr>
-                <th onclick="serad(0, 'string')">Katalog</th>
-                <th onclick="serad(1, 'number')">Počet</th>
-                <th onclick="serad(2, 'string')">Pozice</th>
+                <th onclick="serad(0, 'string')">Katalog ↕</th>
+                <th onclick="serad(1, 'number')">Počet ↕</th>
+                <th onclick="serad(2, 'string')">Pozice ↕</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -99,6 +104,7 @@
 <input type="file" id="work-input" accept=".csv">
 
 <script>
+    // --- Jádro aplikace zůstává stejné jako v předchozí verzi ---
     const btnMic = document.getElementById('btn-mic');
     const debugText = document.getElementById('debug-text');
     const statusBar = document.getElementById('status-bar');
@@ -108,36 +114,25 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
-    let smerRazeni = [true, true, true]; // true = ASC, false = DESC
+    let smerRazeni = [true, true, true];
 
     function aktualizujStatus() {
-        statusBar.innerText = `📦 Databáze: ${seznamArtiklu.length} artiklů | Automatické ukládání: OK`;
+        statusBar.innerText = `📦 Databáze: ${seznamArtiklu.length} artiklů | Automatické ukládání: AKTIVNÍ`;
     }
 
-    // --- ŘAZENÍ ---
     function serad(sloupec, typ) {
         const radky = Array.from(tbody.querySelectorAll('tr'));
         const asc = smerRazeni[sloupec];
-        
         radky.sort((a, b) => {
             let valA = a.cells[sloupec].innerText.trim();
             let valB = b.cells[sloupec].innerText.trim();
-            
-            if (typ === 'number') {
-                return asc ? parseFloat(valA || 0) - parseFloat(valB || 0) : parseFloat(valB || 0) - parseFloat(valA || 0);
-            }
+            if (typ === 'number') return asc ? parseFloat(valA || 0) - parseFloat(valB || 0) : parseFloat(valB || 0) - parseFloat(valA || 0);
             return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
         });
-        
         radky.forEach(r => tbody.appendChild(r));
         smerRazeni[sloupec] = !asc;
-        
-        // Vizuální zpětná vazba na hlavičkách
-        const ths = document.querySelectorAll('th');
-        ths.forEach((th, i) => th.innerText = th.innerText.replace(/[▲▼]/g, '') + (i === sloupec ? (asc ? ' ▲' : ' ▼') : ''));
     }
 
-    // --- FILTROVÁNÍ ---
     function aplikujFiltry() {
         const vKat = fKat.value.toLowerCase();
         const vPoz = fPoz.value.toLowerCase();
@@ -150,7 +145,6 @@
     fKat.oninput = aplikujFiltry;
     fPoz.oninput = aplikujFiltry;
 
-    // --- CHYTRÉ NACHÁZENÍ KÓDŮ ---
     function najdiShodu(text) {
         if (!text || seznamArtiklu.length === 0) return text;
         let h = text.replace(/\s+/g, '').toLowerCase();
@@ -160,7 +154,6 @@
         return s || text;
     }
 
-    // --- HLAS (Vyladěný) ---
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'cs-CZ';
@@ -209,7 +202,6 @@
         };
     }
 
-    // --- OSTATNÍ FUNKCE ---
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
