@@ -3,39 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hlasový Skladník</title>
+    <title>Skladník 2026</title>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 10px; margin: 0; }
-        .container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 5px; }
-        #debug-text { font-size: 13px; color: #7f8c8d; text-align: center; margin-bottom: 15px; min-height: 18px; font-style: italic; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        button { width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; }
-        #btn-mic { background: #e74c3c; }
-        #btn-mic.active { background: #2ecc71; }
-        .tlacitka-pruh { display: flex; gap: 8px; margin-bottom: 10px; }
-        .tlacitka-pruh button { flex: 1; font-size: 13px; padding: 12px 5px; margin-bottom: 0; }
-        #btn-smazat { background: #e67e22; }
-        #btn-pridat { background: #34495e; }
-        #btn-export { background: #3498db; }
-        #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 2px solid #3498db; border-radius: 8px; font-size: 16px; }
-        table { width: 100%; border-collapse: collapse; font-size: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f8f9fa; }
-        td[contenteditable="true"] { background-color: #fffde7; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 10px; margin: 0; }
+        .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); max-width: 500px; margin: auto; }
+        h1 { text-align: center; color: #1a1a1a; margin-bottom: 5px; }
+        #debug-text { font-size: 12px; color: #65676b; text-align: center; margin-bottom: 15px; padding: 5px; background: #f8f9fa; border-radius: 5px; border: 1px dashed #ccc; }
+        button { width: 100%; padding: 16px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        #btn-mic { background: #eb3b5a; color: white; }
+        #btn-mic.active { background: #20bf6b; transform: scale(0.98); }
+        .pruh { display: flex; gap: 8px; margin-bottom: 10px; }
+        .pruh button { flex: 1; font-size: 12px; padding: 12px 5px; color: white; }
+        #btn-smazat { background: #fa8231; }
+        #btn-pridat { background: #4b6584; }
+        #btn-export { background: #3867d6; }
+        #filtr-pozice { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 2px solid #3867d6; border-radius: 8px; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f1f2f6; }
+        tr:nth-child(even) { background: #fafafa; }
+        td[contenteditable="true"] { background: #fff9c4; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Skladník 📦</h1>
-    <div id="debug-text">Zde uvidíš surový odposlech...</div>
+    <div id="debug-text">Zde uvidíš, co Google zachytil...</div>
+    
     <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
-    <div class="tlacitka-pruh">
+    
+    <div class="pruh">
         <button id="btn-smazat">🗑️ SMAZAT</button>
-        <button id="btn-pridat">➕ PŘIDAT RUČNĚ</button>
+        <button id="btn-pridat">➕ RUČNĚ</button>
         <button id="btn-export">💾 EXCEL</button>
     </div>
+
     <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici (např. C2)...">
+
     <table id="tabulka">
         <thead>
             <tr><th>Katalog</th><th>Počet</th><th>Pozice</th></tr>
@@ -46,110 +51,101 @@
 
 <script>
     const btnMic = document.getElementById('btn-mic');
+    const debugText = document.getElementById('debug-text');
     const tbody = document.querySelector('#tabulka tbody');
     const filtr = document.getElementById('filtr-pozice');
-    const debugText = document.getElementById('debug-text');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    const cislaSlovy = {
-        "jedna": "1", "jeden": "1", "dva": "2", "tři": "3", "čtyři": "4", "pět": "5",
-        "šest": "6", "sedm": "7", "osm": "8", "devět": "9", "deset": "10"
+    const slovnik = {
+        "sedum": "7", "osum": "8", "jedna": "1", "jeden": "1", "dva": "2", "dvě": "2", "tři": "3", 
+        "čtyři": "4", "pět": "5", "šest": "6", "sedm": "7", "osm": "8", "devět": "9", "deset": "10",
+        "čtyřikrát": "4", "třikrát": "3", "dvakrát": "2", "pětkrát": "5"
     };
 
     function pridejRadek(kat = "", poc = "", poz = "") {
         if (!poz && filtr.value.trim() !== "") poz = filtr.value.trim();
         const radek = document.createElement('tr');
-        radek.innerHTML = `
-            <td contenteditable="true">${kat}</td>
-            <td contenteditable="true">${poc}</td>
-            <td contenteditable="true">${poz}</td>
-        `;
+        radek.innerHTML = `<td contenteditable="true">${kat}</td><td contenteditable="true">${poc}</td><td contenteditable="true">${poz}</td>`;
         tbody.appendChild(radek);
-        aplikujFiltr();
         return radek;
     }
-
-    function aplikujFiltr() {
-        const h = filtr.value.toLowerCase().trim();
-        document.querySelectorAll('#tabulka tbody tr').forEach(r => {
-            r.style.display = (h === "" || r.cells[2].innerText.toLowerCase().includes(h)) ? '' : 'none';
-        });
-    }
-
-    filtr.addEventListener('input', aplikujFiltr);
-    document.getElementById('btn-pridat').onclick = () => pridejRadek();
 
     if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'cs-CZ';
-        
+        rec.interimResults = false;
+
         btnMic.onclick = () => { rec.start(); btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
 
         rec.onresult = (event) => {
             let raw = event.results[0][0].transcript.toLowerCase();
-            debugText.innerText = '🤖 Slyšel jsem: "' + raw + '"';
+            debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
             btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
 
-            // Čištění textu
+            // 1. Základní čištění
             let t = raw.replace(/[.,-]/g, " ");
 
-            // Násobky nul
-            t = t.replace(/(čtyři|4)\s*(nuly|nula|nul)/g, "0000");
-            t = t.replace(/(tři|3)\s*(nuly|nula|nul)/g, "000");
-            t = t.replace(/(dvě|2)\s*(nuly|nula|nul)/g, "00");
-            t = t.replace(/nula|nulu|nuly|nul/g, "0");
+            // 2. Oprava slovní výslovnosti čísel
+            for (let slovo in slovnik) {
+                t = t.replace(new RegExp(slovo, 'g'), slovnik[slovo]);
+            }
 
-            for (let s in cislaSlovy) { t = t.replace(new RegExp(s, 'g'), cislaSlovy[s]); }
+            // 3. MAGICKÁ OPRAVA NUL (i když Google napíše jen "4 0" nebo "4 00")
+            // Pokud najde číslici 2-5 následovanou nulou nebo slovem nula, nahradí ji správným počtem nul
+            t = t.replace(/(5)\s*(nula|nul|nuly|0+)/g, "00000");
+            t = t.replace(/(4)\s*(nula|nul|nuly|0+)/g, "0000");
+            t = t.replace(/(3)\s*(nula|nul|nuly|0+)/g, "000");
+            t = t.replace(/(2)\s*(nula|nul|nuly|0+)/g, "00");
+            t = t.replace(/nula|nuly|nul/g, "0");
 
+            // 4. Rozdělení na části
             let kat = "", poc = "", poz = "";
-            const dily = t.split(/(počet|pozice|pozici)/);
-            let kontext = "kat";
-            
-            dily.forEach(d => {
-                let txt = d.trim();
-                if (txt === "počet") { kontext = "poc"; return; }
-                if (txt === "pozice" || txt === "pozici") { kontext = "poz"; return; }
-                if (kontext === "kat") kat += txt;
-                if (kontext === "poc") poc += txt;
-                if (kontext === "poz") poz += txt;
+            const dily = t.split(/(počet|počet kusů|pozice|pozici)/);
+            let rezim = "kat";
+
+            dily.forEach(dil => {
+                let d = dil.trim();
+                if (d.includes("počet")) { rezim = "poc"; return; }
+                if (d.includes("pozice") || d.includes("pozici")) { rezim = "poz"; return; }
+                if (rezim === "kat") kat += d;
+                if (rezim === "poc") poc += d;
+                if (rezim === "poz") poz += d;
             });
 
-            // KLÍČOVÁ OPRAVA: Odstraníme ÚPLNĚ VŠECHNY mezery z katalogového čísla
+            // 5. Finální vyčištění katalogu (slepíme vše k sobě a vymažeme slovo katalog)
             kat = kat.replace(/katalog/g, "").replace(/\s+/g, "").trim();
-            // Pokud tam zůstalo osamocené "pn" nebo "lm", zajistíme, aby bylo na začátku
-            if (kat.includes("pn") && !kat.startsWith("pn")) kat = "pn" + kat.replace("pn", "");
-            if (kat.includes("lm") && !kat.startsWith("lm")) kat = "lm" + kat.replace("lm", "");
-            
-            poc = poc.replace(/[^\d]/g, '');
+            poc = poc.replace(/[^\d]/g, ''); // v počtu jen čísla
             poz = poz.trim();
 
-            const viditelne = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
-            const posledni = viditelne[viditelne.length - 1];
+            // 6. Zápis do tabulky
+            const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+            const posledni = radky[radky.length - 1];
 
             if (posledni && !kat.match(/pn|lm/i) && (poc || poz)) {
                 if (poc && !posledni.cells[1].innerText) posledni.cells[1].innerText = poc;
                 if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
             } else {
-                pridejRadek(kat, poc, poz);
+                if (kat || poc || poz) pridejRadek(kat, poc, poz);
             }
         };
     }
 
+    // Ostatní funkce (Export, Smazat, Filtr) zůstávají stejné...
     document.getElementById('btn-smazat').onclick = () => {
         const v = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
         if (v.length > 0) tbody.removeChild(v[v.length - 1]);
     };
-
+    document.getElementById('btn-pridat').onclick = () => pridejRadek();
+    filtr.oninput = () => {
+        const h = filtr.value.toLowerCase();
+        tbody.querySelectorAll('tr').forEach(r => r.style.display = r.cells[2].innerText.toLowerCase().includes(h) ? '' : 'none');
+    };
     document.getElementById('btn-export').onclick = () => {
-        let csv = "\ufeffKatalog;Pocet;Pozice\n";
-        tbody.querySelectorAll('tr').forEach(tr => {
-            csv += `${tr.cells[0].innerText};${tr.cells[1].innerText};${tr.cells[2].innerText}\n`;
-        });
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        let csv = "\ufeffKatalog;Počet;Pozice\n";
+        tbody.querySelectorAll('tr').forEach(tr => csv += `${tr.cells[0].innerText};${tr.cells[1].innerText};${tr.cells[2].innerText}\n`);
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'inventura.csv';
-        a.click();
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        a.download = 'sklad.csv'; a.click();
     };
 </script>
 </body>
