@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Opravená Logika Nul</title>
+    <title>Skladník 1 - Stabilní</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -48,6 +48,8 @@
             text-align: left; 
             border: 1px solid var(--border-color);
             box-shadow: 0 2px 2px rgba(0,0,0,0.1);
+            cursor: pointer;
+            user-select: none;
         }
 
         td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
@@ -60,7 +62,7 @@
 
 <div class="header-sticky" id="main-header">
     <div class="header-content">
-        <h1>Skladník 2026 📦</h1>
+        <h1>Skladník 1 📦</h1>
         <div id="status-bar">Načítání...</div>
         <div id="instruction-overlay">Hlasový pokyn</div>
         <div id="debug-text">Slyšeno: -</div>
@@ -73,6 +75,7 @@
         
         <div class="mrizka">
             <button id="btn-import-artikl" style="background:#4b6584" onclick="document.getElementById('artikl-input').click()">📖 NAHRÁT ARTIKLY (CSV)</button>
+            <button id="btn-import-barcode" style="background:#00b894" onclick="document.getElementById('barcode-input').click()">🏷️ NAHRÁT EANy (CSV)</button>
             <button id="btn-import-work" style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 NAHRÁT ROZDĚLANÉ</button>
             <button id="btn-smazat" style="background:#fa8231">🗑️ SMAZAT POSLEDNÍ</button>
             <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT INVENTURU</button>
@@ -89,9 +92,9 @@
     <table id="tabulka">
         <thead>
             <tr>
-                <th>Katalog</th>
-                <th>Počet</th>
-                <th>Pozice</th>
+                <th onclick="serad(0, 'string')">Katalog ↕</th>
+                <th onclick="serad(1, 'number')">Počet ↕</th>
+                <th onclick="serad(2, 'string')">Pozice ↕</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -99,6 +102,7 @@
 </div>
 
 <input type="file" id="artikl-input" accept=".csv">
+<input type="file" id="barcode-input" accept=".csv">
 <input type="file" id="work-input" accept=".csv">
 
 <script>
@@ -110,6 +114,8 @@
     const btnMic = document.getElementById('btn-mic');
     
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
+    let barcodeMap = JSON.parse(localStorage.getItem('barcodeMap')) || {};
+    let smerRazeni = [true, true, true];
     let currentStep = "none"; 
     let currentRow = null;
     let html5QrCode;
@@ -129,19 +135,31 @@
         Array.from(tbody.rows).forEach(r => r.style.display = r.cells[2].innerText.toLowerCase().includes(h) ? '' : 'none');
     };
 
-    // --- TVÁ PŮVODNÍ LOGIKA SHODY (ULTRA PROFI) ---
+    // --- ŘAZENÍ SLOUPCŮ ---
+    function serad(sloupec, typ) {
+        const radky = Array.from(tbody.rows);
+        const asc = smerRazeni[sloupec];
+        radky.sort((a, b) => {
+            let vA = a.cells[sloupec].innerText.trim();
+            let vB = b.cells[sloupec].innerText.trim();
+            if (typ === 'number') return asc ? parseFloat(vA||0) - parseFloat(vB||0) : parseFloat(vB||0) - parseFloat(vA||0);
+            return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        });
+        radky.forEach(r => tbody.appendChild(r));
+        smerRazeni[sloupec] = !asc;
+        document.querySelectorAll('th').forEach((th, i) => {
+            th.innerText = th.innerText.replace(/[↕▲▼]/g, '').trim() + (i === sloupec ? (asc ? ' ▲' : ' ▼') : ' ↕');
+        });
+    }
+
+    // --- LOGIKA SHODY ---
     function najdiNejlepsiShodu(text) {
         if (!text || seznamArtiklu.length === 0) return text;
         let hledany = text.replace(/\s+/g, '').toLowerCase();
-        
-        // 1. Zkusíme přesnou shodu bez mezer
         let shoda = seznamArtiklu.find(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
         if (shoda) return shoda;
-
-        // 2. Pokud není přesná, zkusíme najít první kód, který obsahuje daný řetězec
         shoda = seznamArtiklu.find(a => a.toLowerCase().includes(hledany));
         if (shoda) return shoda;
-
         return text;
     }
 
@@ -151,107 +169,63 @@
     recognition.lang = 'cs-CZ';
     recognition.continuous = false;
 
-    recognition.onstart = () => {
-        btnMic.classList.add('active');
-        btnMic.innerText = "⏳ POSLOUCHÁM...";
-    };
-    
-    recognition.onend = () => {
-        btnMic.classList.remove('active');
-        btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
-        if (currentStep !== "none") {
-            try { recognition.start(); } catch(e) {} 
-        }
+    recognition.onstart = () => { btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
+    recognition.onend = () => { 
+        btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
+        if (currentStep !== "none") try { recognition.start(); } catch(e) {} 
     };
 
     recognition.onresult = (event) => {
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
-        
         if (currentStep === "waiting_qty") {
             let num = raw.replace(/[^\d]/g, '');
-            if (num) {
-                currentRow.cells[1].innerText = num;
-                autoUlozeni();
-                currentStep = "waiting_pos";
-                showStep();
-            }
+            if (num) { currentRow.cells[1].innerText = num; autoUlozeni(); currentStep = "waiting_pos"; showStep(); }
         } else if (currentStep === "waiting_pos") {
             currentRow.cells[2].innerText = raw.toUpperCase().replace(/\s/g, '');
-            autoUlozeni();
-            currentStep = "none";
-            showStep();
-        } else {
-            zpracujHlas(raw);
-        }
+            autoUlozeni(); currentStep = "none"; showStep();
+        } else { zpracujHlas(raw); }
     };
 
     function showStep() {
         overlay.style.display = (currentStep !== "none") ? "block" : "none";
-        if (currentStep === "waiting_qty") {
-            overlay.innerText = "🎤 ŘEKNĚTE POČET";
-            overlay.style.background = "var(--danger)";
-        } else if (currentStep === "waiting_pos") {
-            overlay.innerText = "🎤 ŘEKNĚTE POZICI";
-            overlay.style.background = "var(--primary)";
-        }
+        if (currentStep === "waiting_qty") { overlay.innerText = "🎤 ŘEKNĚTE POČET"; overlay.style.background = "var(--danger)"; }
+        else if (currentStep === "waiting_pos") { overlay.innerText = "🎤 ŘEKNĚTE POZICI"; overlay.style.background = "var(--primary)"; }
     }
 
     function zpracujHlas(text) {
-        // Fonetické opravy nul před rozdělením
-        let t = text.replace(/pět nul[y]?/g, "00000")
-                    .replace(/čtyři nuly/g, "0000")
-                    .replace(/tři nuly/g, "000")
-                    .replace(/dvě nuly/g, "00")
-                    .replace(/lomeno/g, "/")
-                    .replace(/hvězdička|hvězda/g, "*")
-                    .replace(/pomlčka|mínus/g, "-")
-                    .replace(/tečka/g, ".")
-                    .replace(/plus/g, "+");
-
+        let t = text.replace(/pět nul[y]?/g, "00000").replace(/čtyři nuly/g, "0000").replace(/tři nuly/g, "000").replace(/dvě nuly/g, "00")
+                    .replace(/lomeno/g, "/").replace(/hvězdička|hvězda/g, "*").replace(/pomlčka|mínus/g, "-").replace(/tečka/g, ".").replace(/plus/g, "+");
         let rawKat = "", rawPoc = "", rawPoz = "";
         const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
         let rezim = "kat";
-
         dily.forEach(dil => {
             let d = dil.trim();
             if (d.match(/počet|kusů|kusy/)) { rezim = "poc"; return; }
             if (d.match(/pozice|pozici/)) { rezim = "poz"; return; }
-            if (rezim === "kat") rawKat += d;
-            if (rezim === "poc") rawPoc += d;
-            if (rezim === "poz") rawPoz += d;
+            if (rezim === "kat") rawKat += d; if (rezim === "poc") rawPoc += d; if (rezim === "poz") rawPoz += d;
         });
-
-        // TVÁ PŮVODNÍ LOGIKA NUL PRO PN/LM
         let kat = rawKat.replace(/\s+/g, "");
         if (kat.match(/^pn|^lm/i)) {
-            // Reaguje na specifické diktování "50" jako pět nul atd.
             kat = kat.replace(/(5)0+/g, "00000").replace(/(4)0+/g, "0000").replace(/(3)0+/g, "000").replace(/(2)0+/g, "00");
-            // Klasický přepis slov na nuly
             kat = kat.replace(/nula|nuly|nul/g, "0");
         }
-        
-        // Přichycení k seznamu
         kat = najdiNejlepsiShodu(kat).toUpperCase();
         let poc = rawPoc.replace(/[^\d]/g, '').trim();
         let poz = rawPoz.trim() || filtrPozice.value;
-
         const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
         const posledni = radky[radky.length - 1];
-
         if (posledni && !kat && (poc || poz)) {
             if (poc && !posledni.cells[1].innerText) posledni.cells[1].innerText = poc;
             if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
             autoUlozeni();
-        } else {
-            if (kat || poc || poz) pridejRadek(kat, poc, poz);
-        }
+        } else { if (kat || poc || poz) pridejRadek(kat, poc, poz); }
         window.scrollTo(0, document.body.scrollHeight);
     }
 
     btnMic.onclick = () => { try { recognition.start(); } catch(e) {} };
 
-    // --- SKENER ---
+    // --- SKENER A EAN MAPOVÁNÍ ---
     document.getElementById('btn-scan').onclick = () => {
         const readerDiv = document.getElementById('reader');
         if (!scannerActive) {
@@ -260,8 +234,8 @@
             html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: { width: 250, height: 150 } }, (decodedText) => {
                 if (navigator.vibrate) navigator.vibrate(100);
                 stopScanner();
-                // I naskenovaný kód proženeme tvou vyhledávací logikou pro jistotu
-                let kat = najdiNejlepsiShodu(decodedText.toUpperCase());
+                let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
+                kat = najdiNejlepsiShodu(kat);
                 currentRow = pridejRadek(kat, "", filtrPozice.value);
                 currentStep = "waiting_qty";
                 showStep();
@@ -271,16 +245,9 @@
         } else { stopScanner(); }
     };
 
-    function stopScanner() {
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                document.getElementById('reader').style.display = 'none';
-                scannerActive = false;
-            });
-        }
-    }
+    function stopScanner() { if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; scannerActive = false; }); }
 
-    // --- POMOCNÉ FUNKCE ---
+    // --- DATA ---
     function pridejRadek(k="", p="", z="", u=true) {
         if (!z && filtrPozice.value.trim() !== "") z = filtrPozice.value.trim();
         const r = document.createElement('tr');
@@ -297,7 +264,7 @@
         localStorage.setItem('skladnikData', JSON.stringify(d));
     }
 
-    function vymazatVse() { if (confirm("Smazat celou inventuru? (Artikly zůstanou)")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
 
     document.getElementById('btn-smazat').onclick = () => {
         const v = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
@@ -313,19 +280,27 @@
         a.download = nazev + ".csv"; a.click();
     };
 
+    // --- IMPORTY ---
     document.getElementById('artikl-input').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            const radky = ev.target.result.split('\n');
-            const nove = [];
-            radky.forEach(r => {
-                let c = r.split(',')[0].split(';')[0].replace(/"/g, '').trim();
-                if (c && c !== "Katalog") nove.push(c);
+            const nove = ev.target.result.split('\n').map(r => r.split(',')[0].split(';')[0].replace(/"/g, '').trim()).filter(c => c && c !== "Katalog");
+            seznamArtiklu = nove; localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
+            aktualizujStatus(); alert(`Nahráno ${nove.length} artiklů!`);
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    document.getElementById('barcode-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const m = {};
+            ev.target.result.split('\n').forEach(r => {
+                const s = r.split(';');
+                if (s.length >= 2) m[s[0].trim()] = s[1].trim();
             });
-            seznamArtiklu = nove;
-            localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
-            aktualizujStatus();
-            alert(`Úspěšně nahráno ${nove.length} artiklů!`);
+            barcodeMap = m; localStorage.setItem('barcodeMap', JSON.stringify(m));
+            aktualizujStatus(); alert(`Nahráno ${Object.keys(m).length} čárových kódů!`);
         };
         reader.readAsText(e.target.files[0]);
     };
@@ -343,7 +318,7 @@
         reader.readAsText(e.target.files[0]);
     };
 
-    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů v databázi: ${seznamArtiklu.length} | 💾 Automatické ukládání aktivní`; }
+    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length} | 💾 Auto-save OK`; }
 
     window.onload = () => {
         const u = localStorage.getItem('skladnikData');
