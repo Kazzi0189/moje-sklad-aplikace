@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Stabilní Artikl Logic</title>
+    <title>Skladník 2026 - Opravená verze</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* --- FIXNÍ HORNÍ PANEL --- */
+        /* FIXACE PANELU */
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
@@ -34,11 +34,11 @@
         .mrizka button { padding: 10px 4px; font-size: 10px; }
         
         .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .filtry input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; }
+        .filtry input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
-        /* --- FIXNÍ ZÁHLAVÍ TABULKY --- */
+        /* FIXACE ZÁHLAVÍ TABULKY */
         .table-container { width: 100%; max-width: 1200px; padding: 0 15px 40px 15px; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border-color); }
         
@@ -56,6 +56,7 @@
         td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
         tr:nth-child(even) { background: #f9f9f9; }
         td[contenteditable="true"] { background: #fffde7; }
+        input[type="file"] { display: none; }
     </style>
 </head>
 <body>
@@ -126,9 +127,8 @@
     // --- DYNAMICKÁ FIXACE HLAVIČKY ---
     function fixHeader() {
         const headerHeight = document.getElementById('main-header').offsetHeight;
-        document.querySelectorAll('thead th').forEach(th => th.style.top = headerHeight + 'px');
+        document.querySelectorAll('thead th').forEach(th => th.style.top = (headerHeight - 2) + 'px');
     }
-    // Sledování změn velikosti (např. otevření skeneru)
     const resizeObserver = new ResizeObserver(() => fixHeader());
     resizeObserver.observe(document.getElementById('main-header'));
 
@@ -155,7 +155,7 @@
     recognition.onend = () => {
         btnMic.classList.remove('active');
         if (currentStep !== "none") {
-            recognition.start(); // Restartuj, dokud nemáme údaj
+            try { recognition.start(); } catch(e) {} 
         }
     };
 
@@ -194,14 +194,17 @@
         }
     }
 
-    // --- LOGIKA ARTIKLU (PN00005) ---
+    // --- LOGIKA ARTIKLU (PN + NULY) ---
     function najdiShoduVArtiklech(vstup) {
-        let nVstup = vstup.toLowerCase().replace(/\s+/g, '');
-        // Pokud uživatel říká "nuly", převedeme to na řetězec pro porovnání
-        nVstup = nVstup.replace(/nula|nuly/g, '0');
-        
+        // Převede slova na nuly pro porovnání
+        let nVstup = vstup.toLowerCase()
+            .replace(/čtyři nuly/g, '0000')
+            .replace(/tři nuly/g, '000')
+            .replace(/dvě nuly/g, '00')
+            .replace(/nula/g, '0')
+            .replace(/\s+/g, '');
+
         if (seznamArtiklu.length > 0) {
-            // Najde první položku v seznamu, která po očištění odpovídá vstupu
             let shoda = seznamArtiklu.find(a => {
                 let nArtikl = a.toLowerCase().replace(/[^a-z0-9]/g, '');
                 let nVstupCisty = nVstup.replace(/[^a-z0-9]/g, '');
@@ -209,7 +212,7 @@
             });
             if (shoda) return shoda;
         }
-        return vstup.toUpperCase().replace(/\s+/g, ''); // Nouzovka
+        return nVstup.toUpperCase();
     }
 
     function zpracujCelýHlas(text) {
@@ -232,9 +235,7 @@
         window.scrollTo(0, document.body.scrollHeight);
     }
 
-    btnMic.onclick = () => {
-        try { recognition.start(); } catch(e) {} 
-    };
+    btnMic.onclick = () => { try { recognition.start(); } catch(e) {} };
 
     // --- SKENER ---
     document.getElementById('btn-scan').onclick = () => {
@@ -250,7 +251,7 @@
                     currentRow = pridejRadek(nalezenyKatalog, "", fPoz.value);
                     currentStep = "waiting_qty";
                     showStep();
-                    recognition.start();
+                    setTimeout(() => { try { recognition.start(); } catch(e) {} }, 500);
                 } else {
                     alert("EAN " + decodedText + " neznámý.");
                     stopScanner();
@@ -269,7 +270,7 @@
         }
     }
 
-    // --- POMOCNÉ FUNKCE ---
+    // --- TABULKA A EXPORT ---
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
@@ -290,9 +291,7 @@
         });
         radky.forEach(r => tbody.appendChild(r));
         smerRazeni[sloupec] = !asc;
-        // Sipky v zahlavi
-        const ths = document.querySelectorAll('th');
-        ths.forEach((th, i) => th.innerText = th.innerText.replace(/[↕▲▼]/g, '') + (i === sloupec ? (asc ? ' ▲' : ' ▼') : ' ↕'));
+        document.querySelectorAll('th').forEach((th, i) => th.innerText = th.innerText.replace(/[↕▲▼]/g, '') + (i === sloupec ? (asc ? ' ▲' : ' ▼') : ' ↕'));
     }
 
     function autoUlozeni() {
@@ -317,4 +316,48 @@
     document.getElementById('artikl-input').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            seznamArtiklu
+            seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].replace(/"/g, '').trim()).filter(c => c && c !== "Katalog");
+            localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
+            aktualizujStatus();
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    document.getElementById('barcode-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const m = {};
+            ev.target.result.split('\n').forEach(r => {
+                const s = r.split(';');
+                if (s.length >= 2) m[s[0].trim()] = s[1].trim();
+            });
+            barcodeMap = m;
+            localStorage.setItem('barcodeMap', JSON.stringify(m));
+            aktualizujStatus();
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    document.getElementById('work-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            ev.target.result.split('\n').forEach((r, i) => {
+                if (i === 0 || !r.trim()) return;
+                const s = r.split(';');
+                if (s.length >= 3) pridejRadek(s[0].replace(/"/g, ""), s[1].replace(/"/g, ""), s[2].replace(/"/g, ""), false);
+            });
+            autoUlozeni();
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    function aktualizujStatus() { statusBar.innerHTML = `Artikly: ${seznamArtiklu.length} | EANy: ${Object.keys(barcodeMap).length}`; }
+
+    window.onload = () => {
+        const u = localStorage.getItem('skladnikData');
+        if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
+        aktualizujStatus();
+    };
+</script>
+</body>
+</html>
