@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 1 - Rozdělené filtry</title>
+    <title>Skladník 1 - Výběr shod</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -32,11 +32,23 @@
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; }
         
-        /* Styl pro dva filtry */
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .filtry-container input { padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; border: 2px solid #ccc; }
         #filtr-katalog { border-color: #f1c40f; background: #fffdf0; }
         #filtr-pozice { border-color: var(--primary); background: #f0f4ff; }
+
+        /* Modal pro výběr více shod */
+        #modal-shody {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; z-index: 3000; padding: 20px; border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5); width: 90%; max-width: 400px; max-height: 70vh; overflow-y: auto;
+        }
+        .shoda-item { 
+            padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; color: var(--primary);
+            display: flex; justify-content: space-between;
+        }
+        .shoda-item:hover { background: #f0f0f0; }
+        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2999; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
@@ -44,14 +56,8 @@
         table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border-color); }
         
         thead th { 
-            position: sticky; 
-            z-index: 1000;
-            background: #f1f2f6; 
-            padding: 12px 5px; 
-            text-align: left; 
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 2px rgba(0,0,0,0.1);
-            cursor: pointer;
+            position: sticky; z-index: 1000; background: #f1f2f6; padding: 12px 5px; 
+            text-align: left; border: 1px solid var(--border-color); cursor: pointer;
         }
 
         td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
@@ -63,11 +69,17 @@
             100% { background-color: transparent; }
         }
         .new-row { animation: highlight 1.5s ease-out; }
-
         input[type="file"] { display: none; }
     </style>
 </head>
 <body>
+
+<div id="modal-overlay"></div>
+<div id="modal-shody">
+    <h3 style="margin-top:0">Vyberte správný kód:</h3>
+    <div id="seznam-shod"></div>
+    <button onclick="zavriModal()" style="margin-top:15px; background:var(--danger); padding:10px; width:100%">ZRUŠIT</button>
+</div>
 
 <div class="header-sticky" id="main-header">
     <div class="header-content">
@@ -132,53 +144,59 @@
     let html5QrCode;
     let scannerActive = false;
 
-    // --- FUNKCE FILTROVÁNÍ (Katalog AND Pozice) ---
+    // --- FILTROVÁNÍ ---
     function aplikujFiltry() {
         const valKat = filtrKatalog.value.toLowerCase().trim();
         const valPoz = filtrPozice.value.toLowerCase().trim();
-        
         Array.from(tbody.rows).forEach(r => {
-            const rowKat = r.cells[0].innerText.toLowerCase();
-            const rowPoz = r.cells[2].innerText.toLowerCase();
-            const matchesKat = valKat === "" || rowKat.includes(valKat);
-            const matchesPoz = valPoz === "" || rowPoz.includes(valPoz);
+            const matchesKat = valKat === "" || r.cells[0].innerText.toLowerCase().includes(valKat);
+            const matchesPoz = valPoz === "" || r.cells[2].innerText.toLowerCase().includes(valPoz);
             r.style.display = (matchesKat && matchesPoz) ? '' : 'none';
         });
     }
-
     filtrKatalog.oninput = aplikujFiltry;
     filtrPozice.oninput = aplikujFiltry;
 
-    function fixHeader() {
-        const headerHeight = document.getElementById('main-header').offsetHeight;
-        document.querySelectorAll('thead th').forEach(th => th.style.top = (headerHeight - 1) + 'px');
-    }
-    const resizeObserver = new ResizeObserver(() => fixHeader());
-    resizeObserver.observe(document.getElementById('main-header'));
-
-    // --- ŘAZENÍ ---
-    function serad(sloupec, typ) {
-        const radky = Array.from(tbody.rows);
-        const asc = smerRazeni[sloupec];
-        radky.sort((a, b) => {
-            let vA = a.cells[sloupec].innerText.trim();
-            let vB = b.cells[sloupec].innerText.trim();
-            if (typ === 'number') return asc ? parseFloat(vA||0) - parseFloat(vB||0) : parseFloat(vB||0) - parseFloat(vA||0);
-            return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
-        });
-        radky.forEach(r => tbody.appendChild(r));
-        smerRazeni[sloupec] = !asc;
-    }
-
-    // --- LOGIKA SHODY ---
-    function najdiNejlepsiShodu(text) {
-        if (!text || seznamArtiklu.length === 0) return text;
+    // --- NAJDI SHODY (Vylepšeno pro více výsledků) ---
+    function najdiShody(text) {
+        if (!text || seznamArtiklu.length === 0) return [text];
         let hledany = text.replace(/\s+/g, '').toLowerCase();
-        let shoda = seznamArtiklu.find(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
-        if (shoda) return shoda;
-        shoda = seznamArtiklu.find(a => a.toLowerCase().includes(hledany));
-        if (shoda) return shoda;
-        return text;
+        
+        // 1. Přesná shoda
+        let presna = seznamArtiklu.filter(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
+        if (presna.length === 1) return presna;
+
+        // 2. Částečná shoda (obsahuje řetězec)
+        let casti = seznamArtiklu.filter(a => a.toLowerCase().includes(hledany));
+        if (casti.length > 0) return casti;
+
+        return [text];
+    }
+
+    function vyberZMoznosti(seznam, puvodniPocet, puvodniPozice) {
+        const modal = document.getElementById('modal-shody');
+        const overlayM = document.getElementById('modal-overlay');
+        const box = document.getElementById('seznam-shod');
+        box.innerHTML = "";
+        
+        seznam.forEach(s => {
+            let div = document.createElement('div');
+            div.className = "shoda-item";
+            div.innerHTML = `<span>${s}</span> ➔`;
+            div.onclick = () => {
+                zavriModal();
+                dokonciZapis(s, puvodniPocet, puvodniPozice);
+            };
+            box.appendChild(div);
+        });
+        
+        modal.style.display = "block";
+        overlayM.style.display = "block";
+    }
+
+    function zavriModal() {
+        document.getElementById('modal-shody').style.display = "none";
+        document.getElementById('modal-overlay').style.display = "none";
     }
 
     // --- HLASOVÉ OVLÁDÁNÍ ---
@@ -186,42 +204,22 @@
     let recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
 
-    recognition.onstart = () => { btnMic.classList.add('active'); btnMic.innerText = "⏳ POSLOUCHÁM..."; };
-    recognition.onend = () => { 
-        btnMic.classList.remove('active'); btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
-        if (currentStep !== "none") try { recognition.start(); } catch(e) {} 
-    };
-
     recognition.onresult = (event) => {
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
         if (currentStep === "waiting_qty") {
             let num = raw.replace(/[^\d]/g, '');
-            if (num) { 
-                currentRow.cells[1].innerText = num; 
-                autoUlozeni(); 
-                currentStep = "waiting_pos"; 
-                showStep(); 
-            }
+            if (num) { currentRow.cells[1].innerText = num; autoUlozeni(); currentStep = "waiting_pos"; showStep(); }
         } else if (currentStep === "waiting_pos") {
             currentRow.cells[2].innerText = raw.toUpperCase().replace(/\s/g, '');
             autoUlozeni(); currentStep = "none"; showStep();
         } else { zpracujHlas(raw); }
     };
 
-    function showStep() {
-        overlay.style.display = (currentStep !== "none") ? "block" : "none";
-        if (currentStep === "waiting_qty") { overlay.innerText = "🎤 ŘEKNĚTE POČET"; overlay.style.background = "var(--danger)"; }
-        else if (currentStep === "waiting_pos") { overlay.innerText = "🎤 ŘEKNĚTE POZICI"; overlay.style.background = "var(--primary)"; }
-        if (currentRow) {
-            currentRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            currentRow.classList.add('new-row');
-        }
-    }
-
     function zpracujHlas(text) {
         let t = text.replace(/pět nul[y]?/g, "00000").replace(/čtyři nuly/g, "0000").replace(/tři nuly/g, "000").replace(/dvě nuly/g, "00")
                     .replace(/lomeno/g, "/").replace(/hvězdička|hvězda/g, "*").replace(/pomlčka|mínus/g, "-").replace(/tečka/g, ".").replace(/plus/g, "+");
+        
         let rawKat = "", rawPoc = "", rawPoz = "";
         const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
         let rezim = "kat";
@@ -231,17 +229,22 @@
             if (d.match(/pozice|pozici/)) { rezim = "poz"; return; }
             if (rezim === "kat") rawKat += d; if (rezim === "poc") rawPoc += d; if (rezim === "poz") rawPoz += d;
         });
-        
-        let kat = rawKat.replace(/\s+/g, "");
-        if (kat.match(/^pn|^lm/i)) {
-            kat = kat.replace(/(5)0+/g, "00000").replace(/(4)0+/g, "0000").replace(/(3)0+/g, "000").replace(/(2)0+/g, "00");
-            kat = kat.replace(/nula|nuly|nul/g, "0");
-        }
-        kat = najdiNejlepsiShodu(kat).toUpperCase();
-        let poc = rawPoc.replace(/[^\d]/g, '').trim();
-        // Bere pozici z filtru, pokud není nadiktována
-        let poz = rawPoz.trim() || filtrPozice.value;
 
+        let katText = rawKat.replace(/\s+/g, "");
+        if (katText.match(/^pn|^lm/i)) {
+            katText = katText.replace(/(5)0+/g, "00000").replace(/(4)0+/g, "0000").replace(/(3)0+/g, "000").replace(/(2)0+/g, "00").replace(/nula|nuly|nul/g, "0");
+        }
+
+        let shody = najdiShody(katText);
+
+        if (shody.length > 1) {
+            vyberZMoznosti(shody, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || filtrPozice.value);
+        } else {
+            dokonciZapis(shody[0].toUpperCase(), rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || filtrPozice.value);
+        }
+    }
+
+    function dokonciZapis(kat, poc, poz) {
         const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
         const posledni = radky[radky.length - 1];
 
@@ -249,18 +252,16 @@
             if (poc && !posledni.cells[1].innerText) posledni.cells[1].innerText = poc;
             if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
             autoUlozeni();
-            posledni.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else { 
-            if (kat || poc || poz) {
-                currentRow = pridejRadek(kat, poc, poz);
-                currentRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+        } else {
+            currentRow = pridejRadek(kat, poc, poz);
+            if (!poc) { currentStep = "waiting_qty"; showStep(); setTimeout(() => { try { recognition.start(); } catch(e) {} }, 400); }
+            else if (!poz) { currentStep = "waiting_pos"; showStep(); setTimeout(() => { try { recognition.start(); } catch(e) {} }, 400); }
         }
     }
 
+    // --- OSTATNÍ FUNKCE (Zůstávají zachovány) ---
     btnMic.onclick = () => { try { recognition.start(); } catch(e) {} };
-
-    // --- SKENER ---
+    
     document.getElementById('btn-scan').onclick = () => {
         const readerDiv = document.getElementById('reader');
         if (!scannerActive) {
@@ -270,26 +271,23 @@
                 if (navigator.vibrate) navigator.vibrate(100);
                 stopScanner();
                 let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
-                kat = najdiNejlepsiShodu(kat);
-                // Skener automaticky bere pozici z filtru pozice
-                currentRow = pridejRadek(kat, "", filtrPozice.value);
-                currentStep = "waiting_qty";
-                showStep();
-                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 500);
-            }).catch(e => console.error(e));
+                let shody = najdiShody(kat);
+                if (shody.length > 1) vyberZMoznosti(shody, "", filtrPozice.value);
+                else dokonciZapis(shody[0].toUpperCase(), "", filtrPozice.value);
+            });
             scannerActive = true;
         } else { stopScanner(); }
     };
 
     function stopScanner() { if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; scannerActive = false; }); }
 
-    // --- POMOCNÉ FUNKCE ---
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
         r.querySelectorAll('td').forEach(td => td.addEventListener('input', autoUlozeni));
         tbody.appendChild(r);
         r.classList.add('new-row');
+        r.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (u) autoUlozeni();
         return r;
     }
@@ -300,8 +298,14 @@
         localStorage.setItem('skladnikData', JSON.stringify(d));
     }
 
-    function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    function showStep() {
+        overlay.style.display = (currentStep !== "none") ? "block" : "none";
+        if (currentStep === "waiting_qty") { overlay.innerText = "🎤 ŘEKNĚTE POČET"; overlay.style.background = "var(--danger)"; }
+        else if (currentStep === "waiting_pos") { overlay.innerText = "🎤 ŘEKNĚTE POZICI"; overlay.style.background = "var(--primary)"; }
+    }
 
+    function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    
     document.getElementById('btn-smazat').onclick = () => {
         const v = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
         if (v.length > 0) { tbody.removeChild(v[v.length - 1]); autoUlozeni(); }
@@ -344,7 +348,6 @@
         const u = localStorage.getItem('skladnikData');
         if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
         aktualizujStatus();
-        setTimeout(fixHeader, 500);
     };
 </script>
 </body>
