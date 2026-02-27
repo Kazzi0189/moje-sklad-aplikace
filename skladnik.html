@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Stabilní Verze</title>
+    <title>Skladník 2026 - Opravená Logika Nul</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* FIXNÍ HORNÍ PANEL */
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
-        h1 { text-align: center; margin: 5px 0; font-size: 20px; }
-        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: var(--primary); font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
+        h1 { text-align: center; margin: 5px 0; font-size: 20px; color: #1a1a1a; }
+        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
         
         #instruction-overlay { 
             font-size: 20px; color: white; background: var(--secondary); 
@@ -27,18 +26,17 @@
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         .hlavni-akce { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         #btn-mic { padding: 18px; background: var(--danger); font-size: 18px; }
-        #btn-scan { padding: 18px; background: #2d3436; font-size: 18px; }
         #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); }
+        #btn-scan { padding: 18px; background: #2d3436; font-size: 18px; }
 
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; }
         
-        .filtry { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .filtry { width: 100%; }
         .filtry input { padding: 12px; border: 2px solid var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 16px; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
-        /* FIXNÍ ZÁHLAVÍ TABULKY */
         .table-container { width: 100%; max-width: 1200px; padding: 0 15px 40px 15px; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border-color); }
         
@@ -69,15 +67,15 @@
         <div id="reader"></div>
 
         <div class="hlavni-akce">
-            <button id="btn-mic">🎤 DIKTOVAT</button>
+            <button id="btn-mic">🎤 ZMÁČKNI A DIKTUJ</button>
             <button id="btn-scan">📷 SKENOVAT</button>
         </div>
         
         <div class="mrizka">
-            <button id="btn-import-artikl" style="background:#4b6584" onclick="document.getElementById('artikl-input').click()">📖 NAHRÁT ARTIKLY</button>
+            <button id="btn-import-artikl" style="background:#4b6584" onclick="document.getElementById('artikl-input').click()">📖 NAHRÁT ARTIKLY (CSV)</button>
             <button id="btn-import-work" style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 NAHRÁT ROZDĚLANÉ</button>
             <button id="btn-smazat" style="background:#fa8231">🗑️ SMAZAT POSLEDNÍ</button>
-            <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT EXCEL</button>
+            <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT INVENTURU</button>
             <button id="btn-clear-all" style="background:#4b4b4b; grid-column: 1/-1;" onclick="vymazatVse()">🧨 VYMAZAT TABULKU</button>
         </div>
 
@@ -112,12 +110,12 @@
     const btnMic = document.getElementById('btn-mic');
     
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
-    let scannerActive = false;
     let currentStep = "none"; 
     let currentRow = null;
     let html5QrCode;
+    let scannerActive = false;
 
-    // --- CHYTRÁ FIXACE HLAVIČKY ---
+    // --- DYNAMICKÁ HLAVIČKA ---
     function fixHeader() {
         const headerHeight = document.getElementById('main-header').offsetHeight;
         document.querySelectorAll('thead th').forEach(th => th.style.top = (headerHeight - 1) + 'px');
@@ -131,16 +129,16 @@
         Array.from(tbody.rows).forEach(r => r.style.display = r.cells[2].innerText.toLowerCase().includes(h) ? '' : 'none');
     };
 
-    // --- LOGIKA SHODY (Z TVÉ PŮVODNÍ VERZE) ---
+    // --- TVÁ PŮVODNÍ LOGIKA SHODY (ULTRA PROFI) ---
     function najdiNejlepsiShodu(text) {
         if (!text || seznamArtiklu.length === 0) return text;
         let hledany = text.replace(/\s+/g, '').toLowerCase();
         
-        // 1. Přesná shoda bez mezer a speciálních znaků
+        // 1. Zkusíme přesnou shodu bez mezer
         let shoda = seznamArtiklu.find(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
         if (shoda) return shoda;
 
-        // 2. Obsažení řetězce
+        // 2. Pokud není přesná, zkusíme najít první kód, který obsahuje daný řetězec
         shoda = seznamArtiklu.find(a => a.toLowerCase().includes(hledany));
         if (shoda) return shoda;
 
@@ -155,13 +153,12 @@
 
     recognition.onstart = () => {
         btnMic.classList.add('active');
-        if (currentStep === "none") btnMic.innerText = "⏳ POSLOUCHÁM...";
+        btnMic.innerText = "⏳ POSLOUCHÁM...";
     };
     
     recognition.onend = () => {
         btnMic.classList.remove('active');
-        btnMic.innerText = "🎤 DIKTOVAT";
-        // Pokud jsme uprostřed zadávání počtu/pozice, mikrofon hned znovu zapneme
+        btnMic.innerText = "🎤 ZMÁČKNI A DIKTUJ";
         if (currentStep !== "none") {
             try { recognition.start(); } catch(e) {} 
         }
@@ -185,7 +182,7 @@
             currentStep = "none";
             showStep();
         } else {
-            zpracujCelýHlas(raw);
+            zpracujHlas(raw);
         }
     };
 
@@ -200,8 +197,17 @@
         }
     }
 
-    function zpracujCelýHlas(text) {
-        let t = text.replace(/lomeno/g, "/").replace(/hvězdička|hvězda/g, "*").replace(/pomlčka|mínus/g, "-").replace(/tečka/g, ".").replace(/plus/g, "+");
+    function zpracujHlas(text) {
+        // Fonetické opravy nul před rozdělením
+        let t = text.replace(/pět nul[y]?/g, "00000")
+                    .replace(/čtyři nuly/g, "0000")
+                    .replace(/tři nuly/g, "000")
+                    .replace(/dvě nuly/g, "00")
+                    .replace(/lomeno/g, "/")
+                    .replace(/hvězdička|hvězda/g, "*")
+                    .replace(/pomlčka|mínus/g, "-")
+                    .replace(/tečka/g, ".")
+                    .replace(/plus/g, "+");
 
         let rawKat = "", rawPoc = "", rawPoz = "";
         const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
@@ -216,18 +222,20 @@
             if (rezim === "poz") rawPoz += d;
         });
 
-        // LOGIKA NUL (PŮVODNÍ)
+        // TVÁ PŮVODNÍ LOGIKA NUL PRO PN/LM
         let kat = rawKat.replace(/\s+/g, "");
         if (kat.match(/^pn|^lm/i)) {
+            // Reaguje na specifické diktování "50" jako pět nul atd.
             kat = kat.replace(/(5)0+/g, "00000").replace(/(4)0+/g, "0000").replace(/(3)0+/g, "000").replace(/(2)0+/g, "00");
+            // Klasický přepis slov na nuly
             kat = kat.replace(/nula|nuly|nul/g, "0");
         }
         
+        // Přichycení k seznamu
         kat = najdiNejlepsiShodu(kat).toUpperCase();
         let poc = rawPoc.replace(/[^\d]/g, '').trim();
         let poz = rawPoz.trim() || filtrPozice.value;
 
-        // Pokud jde o doplňování k poslednímu řádku
         const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
         const posledni = radky[radky.length - 1];
 
@@ -250,11 +258,11 @@
             readerDiv.style.display = 'block';
             html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: { width: 250, height: 150 } }, (decodedText) => {
-                // Tady by mělo být párování EAN -> Katalog (pokud máš nahrané EANy)
-                // Zatím skenujeme přímo katalogový kód nebo EAN
                 if (navigator.vibrate) navigator.vibrate(100);
                 stopScanner();
-                currentRow = pridejRadek(decodedText.toUpperCase(), "", filtrPozice.value);
+                // I naskenovaný kód proženeme tvou vyhledávací logikou pro jistotu
+                let kat = najdiNejlepsiShodu(decodedText.toUpperCase());
+                currentRow = pridejRadek(kat, "", filtrPozice.value);
                 currentStep = "waiting_qty";
                 showStep();
                 setTimeout(() => { try { recognition.start(); } catch(e) {} }, 500);
@@ -272,8 +280,9 @@
         }
     }
 
-    // --- OSTATNÍ FUNKCE ---
+    // --- POMOCNÉ FUNKCE ---
     function pridejRadek(k="", p="", z="", u=true) {
+        if (!z && filtrPozice.value.trim() !== "") z = filtrPozice.value.trim();
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
         r.querySelectorAll('td').forEach(td => td.addEventListener('input', autoUlozeni));
@@ -288,7 +297,7 @@
         localStorage.setItem('skladnikData', JSON.stringify(d));
     }
 
-    function vymazatVse() { if (confirm("Smazat celou tabulku?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    function vymazatVse() { if (confirm("Smazat celou inventuru? (Artikly zůstanou)")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
 
     document.getElementById('btn-smazat').onclick = () => {
         const v = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
@@ -316,7 +325,7 @@
             seznamArtiklu = nove;
             localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
             aktualizujStatus();
-            alert(`Nahráno ${nove.length} artiklů!`);
+            alert(`Úspěšně nahráno ${nove.length} artiklů!`);
         };
         reader.readAsText(e.target.files[0]);
     };
@@ -340,7 +349,6 @@
         const u = localStorage.getItem('skladnikData');
         if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
         aktualizujStatus();
-        setTimeout(fixHeader, 500);
     };
 </script>
 </body>
