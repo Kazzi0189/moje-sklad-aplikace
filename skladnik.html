@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 1 - Opravená verze</title>
+    <title>Skladník 1 - Rozdělené filtry</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -32,8 +32,11 @@
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; }
         
-        .filtry { width: 100%; }
-        .filtry input { padding: 12px; border: 2px solid var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 16px; background: #fff9c4; }
+        /* Styl pro dva filtry */
+        .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+        .filtry-container input { padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; border: 2px solid #ccc; }
+        #filtr-katalog { border-color: #f1c40f; background: #fffdf0; }
+        #filtr-pozice { border-color: var(--primary); background: #f0f4ff; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
@@ -55,7 +58,6 @@
         tr:nth-child(even) { background: #f9f9f9; }
         td[contenteditable="true"] { background: #fffde7; font-weight: bold; }
         
-        /* Animace pro nový řádek */
         @keyframes highlight {
             0% { background-color: var(--success); color: white; }
             100% { background-color: transparent; }
@@ -89,8 +91,9 @@
             <button id="btn-clear-all" style="background:#4b4b4b; grid-column: 1/-1;" onclick="vymazatVse()">🧨 VYMAZAT TABULKU</button>
         </div>
 
-        <div class="filtry">
-            <input type="text" id="filtr-hlavni" placeholder="🔍 Hledat katalog nebo pozici...">
+        <div class="filtry-container">
+            <input type="text" id="filtr-katalog" placeholder="🔍 Hledat katalog...">
+            <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici...">
         </div>
     </div>
 </div>
@@ -117,7 +120,8 @@
     const statusBar = document.getElementById('status-bar');
     const debugText = document.getElementById('debug-text');
     const overlay = document.getElementById('instruction-overlay');
-    const filtrHlavni = document.getElementById('filtr-hlavni');
+    const filtrKatalog = document.getElementById('filtr-katalog');
+    const filtrPozice = document.getElementById('filtr-pozice');
     const btnMic = document.getElementById('btn-mic');
     
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
@@ -128,15 +132,22 @@
     let html5QrCode;
     let scannerActive = false;
 
-    // --- OPRAVENÉ FILTROVÁNÍ (Katalog + Pozice) ---
-    filtrHlavni.oninput = () => {
-        const h = filtrHlavni.value.toLowerCase().trim();
+    // --- FUNKCE FILTROVÁNÍ (Katalog AND Pozice) ---
+    function aplikujFiltry() {
+        const valKat = filtrKatalog.value.toLowerCase().trim();
+        const valPoz = filtrPozice.value.toLowerCase().trim();
+        
         Array.from(tbody.rows).forEach(r => {
-            const kat = r.cells[0].innerText.toLowerCase();
-            const poz = r.cells[2].innerText.toLowerCase();
-            r.style.display = (kat.includes(h) || poz.includes(h)) ? '' : 'none';
+            const rowKat = r.cells[0].innerText.toLowerCase();
+            const rowPoz = r.cells[2].innerText.toLowerCase();
+            const matchesKat = valKat === "" || rowKat.includes(valKat);
+            const matchesPoz = valPoz === "" || rowPoz.includes(valPoz);
+            r.style.display = (matchesKat && matchesPoz) ? '' : 'none';
         });
-    };
+    }
+
+    filtrKatalog.oninput = aplikujFiltry;
+    filtrPozice.oninput = aplikujFiltry;
 
     function fixHeader() {
         const headerHeight = document.getElementById('main-header').offsetHeight;
@@ -228,7 +239,8 @@
         }
         kat = najdiNejlepsiShodu(kat).toUpperCase();
         let poc = rawPoc.replace(/[^\d]/g, '').trim();
-        let poz = rawPoz.trim() || filtrHlavni.value;
+        // Bere pozici z filtru, pokud není nadiktována
+        let poz = rawPoz.trim() || filtrPozice.value;
 
         const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
         const posledni = radky[radky.length - 1];
@@ -259,7 +271,8 @@
                 stopScanner();
                 let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
                 kat = najdiNejlepsiShodu(kat);
-                currentRow = pridejRadek(kat, "", filtrHlavni.value);
+                // Skener automaticky bere pozici z filtru pozice
+                currentRow = pridejRadek(kat, "", filtrPozice.value);
                 currentStep = "waiting_qty";
                 showStep();
                 setTimeout(() => { try { recognition.start(); } catch(e) {} }, 500);
