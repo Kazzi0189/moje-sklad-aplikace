@@ -3,25 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Intelligent Flow</title>
+    <title>Skladník 2026 - Stabilní Sekvence</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
+        /* --- FIXACE HORNÍHO PANELU --- */
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
         h1 { text-align: center; margin: 5px 0; font-size: 20px; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: var(--primary); font-weight: bold; }
         
-        /* Velké upozornění pro sekvenci */
         #instruction-overlay { 
-            font-size: 22px; color: white; background: var(--secondary); 
-            text-align: center; padding: 15px; margin: 10px 0; border-radius: 12px;
-            display: none; animation: pulse 1.5s infinite; font-weight: bold;
+            font-size: 20px; color: white; background: var(--secondary); 
+            text-align: center; padding: 12px; margin: 5px 0; border-radius: 10px;
+            display: none; font-weight: bold; border: 3px solid white;
         }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
         #debug-text { font-size: 13px; color: #555; text-align: center; margin-bottom: 5px; font-style: italic; min-height: 18px; background: #eee; padding: 5px; border-radius: 5px; }
         
@@ -29,25 +28,35 @@
         .hlavni-akce { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         #btn-mic { padding: 18px; background: var(--danger); font-size: 18px; }
         #btn-scan { padding: 18px; background: #2d3436; font-size: 18px; }
-        #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); border: 2px solid white; }
+        #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); }
 
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; }
         
         .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .filtry input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; }
+        .filtry input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
+        /* --- FIXACE ZÁHLAVÍ TABULKY --- */
         .table-container { width: 100%; max-width: 1200px; padding: 0 15px 40px 15px; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border-color); }
-        thead { position: sticky; z-index: 1500; background: #e9ecef; }
-        th { padding: 12px 5px; text-align: left; cursor: pointer; border: 1px solid var(--border-color); font-size: 14px; }
-        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
         
+        /* Klíčová část pro fixaci */
+        thead th { 
+            position: sticky; 
+            top: 0; /* Bude upraveno skriptem podle výšky headeru */
+            background: #e9ecef; 
+            z-index: 1000;
+            padding: 12px 5px; 
+            text-align: left; 
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 2px rgba(0,0,0,0.1);
+        }
+
+        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
         tr:nth-child(even) { background: #f9f9f9; }
         td[contenteditable="true"] { background: #fffde7; }
-        input[type="file"] { display: none; }
     </style>
 </head>
 <body>
@@ -105,16 +114,25 @@
     const overlay = document.getElementById('instruction-overlay');
     const fKat = document.getElementById('filtr-kat');
     const fPoz = document.getElementById('filtr-poz');
+    const btnMic = document.getElementById('btn-mic');
     
     let barcodeMap = JSON.parse(localStorage.getItem('barcodeMap')) || {};
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
     let smerRazeni = [true, true, true];
     let scannerActive = false;
-    let currentStep = "none"; // none, waiting_qty, waiting_pos
+    let currentStep = "none"; 
     let currentRow = null;
     let html5QrCode;
 
-    // --- FILTROVÁNÍ ---
+    // --- FIXACE HLAVIČKY ---
+    function fixHeader() {
+        const headerHeight = document.getElementById('main-header').offsetHeight;
+        document.querySelectorAll('thead th').forEach(th => th.style.top = headerHeight + 'px');
+    }
+    window.addEventListener('resize', fixHeader);
+    window.addEventListener('scroll', fixHeader);
+
+    // --- FILTRY ---
     function aplikujFiltry() {
         const valKat = fKat.value.toLowerCase();
         const valPoz = fPoz.value.toLowerCase();
@@ -127,53 +145,64 @@
     fKat.oninput = aplikujFiltry;
     fPoz.oninput = aplikujFiltry;
 
-    // --- HLASOVÉ ROZPOZNÁVÁNÍ ---
+    // --- HLASOVÉ OVLÁDÁNÍ ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = SpeechRecognition ? new SpeechRecognition() : null;
-    if (recognition) {
-        recognition.lang = 'cs-CZ';
-        recognition.onstart = () => document.getElementById('btn-mic').classList.add('active');
-        recognition.onend = () => document.getElementById('btn-mic').classList.remove('active');
-        recognition.onresult = (event) => {
-            const raw = event.results[0][0].transcript.toLowerCase();
-            debugText.innerText = "Slyšeno: " + raw;
-            
-            if (currentStep === "waiting_qty") {
-                let num = raw.replace(/[^\d]/g, '');
-                if (num) {
-                    currentRow.cells[1].innerText = num;
-                    autoUlozeni();
-                    showStep("waiting_pos");
-                }
-            } else if (currentStep === "waiting_pos") {
-                currentRow.cells[2].innerText = raw.toUpperCase();
-                autoUlozeni();
-                showStep("none");
-            } else {
-                // Klasické diktování celého řádku
-                zpracujCelýHlas(raw);
-            }
-        };
-    }
+    let recognition = new SpeechRecognition();
+    recognition.lang = 'cs-CZ';
+    recognition.continuous = false;
 
-    function showStep(step) {
-        currentStep = step;
+    recognition.onstart = () => btnMic.classList.add('active');
+    
+    recognition.onend = () => {
+        btnMic.classList.remove('active');
+        // KLÍČOVÁ OPRAVA: Pokud čekáme na údaj, mikrofon se hned znovu zapne
+        if (currentStep !== "none") {
+            recognition.start();
+        }
+    };
+
+    recognition.onresult = (event) => {
+        const raw = event.results[0][0].transcript.toLowerCase();
+        debugText.innerText = "Slyšeno: " + raw;
+        
+        if (currentStep === "waiting_qty") {
+            let num = raw.replace(/[^\d]/g, '');
+            if (num) {
+                currentRow.cells[1].innerText = num;
+                autoUlozeni();
+                currentStep = "waiting_pos";
+                showStep();
+            }
+        } else if (currentStep === "waiting_pos") {
+            currentRow.cells[2].innerText = raw.toUpperCase().replace(/\s/g, '');
+            autoUlozeni();
+            currentStep = "none";
+            showStep();
+        } else {
+            zpracujCelýHlas(raw);
+        }
+    };
+
+    function showStep() {
         overlay.style.display = "block";
-        if (step === "waiting_qty") {
+        if (currentStep === "waiting_qty") {
             overlay.innerText = "🎤 ŘEKNĚTE POČET";
             overlay.style.background = "var(--danger)";
-            setTimeout(() => recognition.start(), 500);
-        } else if (step === "waiting_pos") {
+        } else if (currentStep === "waiting_pos") {
             overlay.innerText = "🎤 ŘEKNĚTE POZICI";
             overlay.style.background = "var(--primary)";
-            setTimeout(() => recognition.start(), 500);
         } else {
             overlay.style.display = "none";
         }
+        fixHeader();
     }
 
     function zpracujCelýHlas(text) {
-        let t = text.replace(/lomeno/g, "/").replace(/pomlčka|mínus/g, "-");
+        // OPRAVA PN + NULY
+        let t = text.toLowerCase()
+            .replace(/pn\s*(?:nula|nuly|0)*\s*(\d+)/g, (m, p1) => "PN" + p1.padStart(5, '0'))
+            .replace(/lomeno/g, "/").replace(/pomlčka|mínus/g, "-");
+
         let rKat = "", rPoc = "", rPoz = "";
         const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
         let rezim = "kat";
@@ -185,13 +214,20 @@
             if (rezim === "poc") rPoc += s;
             if (rezim === "poz") rPoz += s;
         });
+
         let kat = rKat.replace(/\s+/g, "").toUpperCase();
         if (seznamArtiklu.length > 0) {
             let shoda = seznamArtiklu.find(a => a.toUpperCase().replace(/[^A-Z0-9]/g,'') === kat.replace(/[^A-Z0-9]/g,''));
             if (shoda) kat = shoda;
         }
         pridejRadek(kat, rPoc.replace(/[^\d]/g, ''), rPoz.trim() || fPoz.value);
+        window.scrollTo(0, document.body.scrollHeight);
     }
+
+    btnMic.onclick = () => {
+        // Pokud už v sekvenci jsme, jen restartujeme recognition, jinak startujeme od nuly
+        try { recognition.start(); } catch(e) { } 
+    };
 
     // --- SKENER ---
     document.getElementById('btn-scan').onclick = () => {
@@ -199,16 +235,18 @@
         if (!scannerActive) {
             readerDiv.style.display = 'block';
             html5QrCode = new Html5Qrcode("reader");
+            fixHeader();
             html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: { width: 250, height: 150 } }, (decodedText) => {
                 const nalezenyKatalog = barcodeMap[decodedText];
                 if (nalezenyKatalog) {
                     if (navigator.vibrate) navigator.vibrate(100);
                     stopScanner();
                     currentRow = pridejRadek(nalezenyKatalog, "", fPoz.value);
-                    window.scrollTo(0, document.body.scrollHeight);
-                    showStep("waiting_qty");
+                    currentStep = "waiting_qty";
+                    showStep();
+                    recognition.start();
                 } else {
-                    alert("Neznámý EAN: " + decodedText);
+                    alert("EAN " + decodedText + " neznámý.");
                     stopScanner();
                 }
             }).catch(e => console.error(e));
@@ -221,11 +259,12 @@
             html5QrCode.stop().then(() => {
                 document.getElementById('reader').style.display = 'none';
                 scannerActive = false;
+                fixHeader();
             });
         }
     }
 
-    // --- POMOCNÉ FUNKCE ---
+    // --- OSTATNÍ FUNKCE ---
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
@@ -246,12 +285,7 @@
         });
         radky.forEach(r => tbody.appendChild(r));
         smerRazeni[sloupec] = !asc;
-        aktualizujSipky(sloupec, asc);
-    }
-
-    function aktualizujSipky(sl, asc) {
-        const ths = document.querySelectorAll('th');
-        ths.forEach((th, i) => th.innerText = th.innerText.replace(/[↕▲▼]/g, '') + (i === sl ? (asc ? ' ▲' : ' ▼') : ' ↕'));
+        fixHeader();
     }
 
     function autoUlozeni() {
@@ -260,9 +294,8 @@
         localStorage.setItem('skladnikData', JSON.stringify(d));
     }
 
-    function vymazatVse() { if (confirm("Opravdu smazat celou tabulku?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
     document.getElementById('btn-smazat').onclick = () => { if (tbody.lastElementChild) { tbody.removeChild(tbody.lastElementChild); autoUlozeni(); } };
-    document.getElementById('btn-mic').onclick = () => { currentStep = "none"; recognition.start(); };
 
     document.getElementById('btn-export').onclick = () => {
         let nazev = prompt("Název souboru:", "inventura_" + new Date().toLocaleDateString());
@@ -273,7 +306,7 @@
         a.download = nazev + ".csv"; a.click();
     };
 
-    // --- IMPORTY ---
+    // IMPORTY
     document.getElementById('artikl-input').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -318,6 +351,7 @@
         const u = localStorage.getItem('skladnikData');
         if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
         aktualizujStatus();
+        setTimeout(fixHeader, 500);
     };
 </script>
 </body>
