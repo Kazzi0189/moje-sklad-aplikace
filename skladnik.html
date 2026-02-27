@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skladník 2026 - Opravená verze</title>
+    <title>Skladník 2026 - Stabilní Verze</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* FIXACE PANELU */
+        /* FIXNÍ HORNÍ PANEL */
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
         h1 { text-align: center; margin: 5px 0; font-size: 20px; }
-        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: var(--primary); font-weight: bold; }
+        #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: var(--primary); font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
         
         #instruction-overlay { 
             font-size: 20px; color: white; background: var(--secondary); 
@@ -33,29 +33,28 @@
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; }
         
-        .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .filtry input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        .filtry { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .filtry input { padding: 12px; border: 2px solid var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 16px; }
 
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
 
-        /* FIXACE ZÁHLAVÍ TABULKY */
+        /* FIXNÍ ZÁHLAVÍ TABULKY */
         .table-container { width: 100%; max-width: 1200px; padding: 0 15px 40px 15px; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border-color); }
         
         thead th { 
             position: sticky; 
             z-index: 1000;
-            background: #e9ecef; 
+            background: #f1f2f6; 
             padding: 12px 5px; 
             text-align: left; 
             border: 1px solid var(--border-color);
             box-shadow: 0 2px 2px rgba(0,0,0,0.1);
-            cursor: pointer;
         }
 
         td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
         tr:nth-child(even) { background: #f9f9f9; }
-        td[contenteditable="true"] { background: #fffde7; }
+        td[contenteditable="true"] { background: #fff9c4; font-weight: bold; }
         input[type="file"] { display: none; }
     </style>
 </head>
@@ -76,16 +75,14 @@
         
         <div class="mrizka">
             <button id="btn-import-artikl" style="background:#4b6584" onclick="document.getElementById('artikl-input').click()">📖 NAHRÁT ARTIKLY</button>
-            <button id="btn-import-barcode" style="background:#00b894" onclick="document.getElementById('barcode-input').click()">🏷️ NAHRÁT EANy</button>
             <button id="btn-import-work" style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 NAHRÁT ROZDĚLANÉ</button>
             <button id="btn-smazat" style="background:#fa8231">🗑️ SMAZAT POSLEDNÍ</button>
             <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT EXCEL</button>
-            <button id="btn-clear-all" style="background:#4b4b4b; grid-column: 1/-1;" onclick="vymazatVse()">🧨 VYMAZAT CELOU TABULKU</button>
+            <button id="btn-clear-all" style="background:#4b4b4b; grid-column: 1/-1;" onclick="vymazatVse()">🧨 VYMAZAT TABULKU</button>
         </div>
 
         <div class="filtry">
-            <input type="text" id="filtr-kat" placeholder="🔍 Filtr Katalog...">
-            <input type="text" id="filtr-poz" placeholder="🔍 Filtr Pozice...">
+            <input type="text" id="filtr-pozice" placeholder="🔍 Hledat pozici (např. C2)...">
         </div>
     </div>
 </div>
@@ -94,9 +91,9 @@
     <table id="tabulka">
         <thead>
             <tr>
-                <th onclick="serad(0, 'string')">Katalog ↕</th>
-                <th onclick="serad(1, 'number')">Počet ↕</th>
-                <th onclick="serad(2, 'string')">Pozice ↕</th>
+                <th>Katalog</th>
+                <th>Počet</th>
+                <th>Pozice</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -104,7 +101,6 @@
 </div>
 
 <input type="file" id="artikl-input" accept=".csv">
-<input type="file" id="barcode-input" accept=".csv">
 <input type="file" id="work-input" accept=".csv">
 
 <script>
@@ -112,37 +108,44 @@
     const statusBar = document.getElementById('status-bar');
     const debugText = document.getElementById('debug-text');
     const overlay = document.getElementById('instruction-overlay');
-    const fKat = document.getElementById('filtr-kat');
-    const fPoz = document.getElementById('filtr-poz');
+    const filtrPozice = document.getElementById('filtr-pozice');
     const btnMic = document.getElementById('btn-mic');
     
-    let barcodeMap = JSON.parse(localStorage.getItem('barcodeMap')) || {};
     let seznamArtiklu = JSON.parse(localStorage.getItem('artiklList')) || [];
-    let smerRazeni = [true, true, true];
     let scannerActive = false;
     let currentStep = "none"; 
     let currentRow = null;
     let html5QrCode;
 
-    // --- DYNAMICKÁ FIXACE HLAVIČKY ---
+    // --- CHYTRÁ FIXACE HLAVIČKY ---
     function fixHeader() {
         const headerHeight = document.getElementById('main-header').offsetHeight;
-        document.querySelectorAll('thead th').forEach(th => th.style.top = (headerHeight - 2) + 'px');
+        document.querySelectorAll('thead th').forEach(th => th.style.top = (headerHeight - 1) + 'px');
     }
     const resizeObserver = new ResizeObserver(() => fixHeader());
     resizeObserver.observe(document.getElementById('main-header'));
 
     // --- FILTROVÁNÍ ---
-    function aplikujFiltry() {
-        const valKat = fKat.value.toLowerCase();
-        const valPoz = fPoz.value.toLowerCase();
-        Array.from(tbody.rows).forEach(tr => {
-            const txtKat = tr.cells[0].innerText.toLowerCase();
-            const txtPoz = tr.cells[2].innerText.toLowerCase();
-            tr.style.display = (txtKat.includes(valKat) && txtPoz.includes(valPoz)) ? "" : "none";
-        });
+    filtrPozice.oninput = () => {
+        const h = filtrPozice.value.toLowerCase();
+        Array.from(tbody.rows).forEach(r => r.style.display = r.cells[2].innerText.toLowerCase().includes(h) ? '' : 'none');
+    };
+
+    // --- LOGIKA SHODY (Z TVÉ PŮVODNÍ VERZE) ---
+    function najdiNejlepsiShodu(text) {
+        if (!text || seznamArtiklu.length === 0) return text;
+        let hledany = text.replace(/\s+/g, '').toLowerCase();
+        
+        // 1. Přesná shoda bez mezer a speciálních znaků
+        let shoda = seznamArtiklu.find(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
+        if (shoda) return shoda;
+
+        // 2. Obsažení řetězce
+        shoda = seznamArtiklu.find(a => a.toLowerCase().includes(hledany));
+        if (shoda) return shoda;
+
+        return text;
     }
-    fKat.oninput = fPoz.oninput = aplikujFiltry;
 
     // --- HLASOVÉ OVLÁDÁNÍ ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -150,18 +153,23 @@
     recognition.lang = 'cs-CZ';
     recognition.continuous = false;
 
-    recognition.onstart = () => btnMic.classList.add('active');
+    recognition.onstart = () => {
+        btnMic.classList.add('active');
+        if (currentStep === "none") btnMic.innerText = "⏳ POSLOUCHÁM...";
+    };
     
     recognition.onend = () => {
         btnMic.classList.remove('active');
+        btnMic.innerText = "🎤 DIKTOVAT";
+        // Pokud jsme uprostřed zadávání počtu/pozice, mikrofon hned znovu zapneme
         if (currentStep !== "none") {
             try { recognition.start(); } catch(e) {} 
         }
     };
 
     recognition.onresult = (event) => {
-        const raw = event.results[0][0].transcript.toLowerCase();
-        debugText.innerText = "Slyšeno: " + raw;
+        let raw = event.results[0][0].transcript.toLowerCase();
+        debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
         
         if (currentStep === "waiting_qty") {
             let num = raw.replace(/[^\d]/g, '');
@@ -182,56 +190,54 @@
     };
 
     function showStep() {
-        overlay.style.display = "block";
+        overlay.style.display = (currentStep !== "none") ? "block" : "none";
         if (currentStep === "waiting_qty") {
             overlay.innerText = "🎤 ŘEKNĚTE POČET";
             overlay.style.background = "var(--danger)";
         } else if (currentStep === "waiting_pos") {
             overlay.innerText = "🎤 ŘEKNĚTE POZICI";
             overlay.style.background = "var(--primary)";
-        } else {
-            overlay.style.display = "none";
         }
-    }
-
-    // --- LOGIKA ARTIKLU (PN + NULY) ---
-    function najdiShoduVArtiklech(vstup) {
-        // Převede slova na nuly pro porovnání
-        let nVstup = vstup.toLowerCase()
-            .replace(/čtyři nuly/g, '0000')
-            .replace(/tři nuly/g, '000')
-            .replace(/dvě nuly/g, '00')
-            .replace(/nula/g, '0')
-            .replace(/\s+/g, '');
-
-        if (seznamArtiklu.length > 0) {
-            let shoda = seznamArtiklu.find(a => {
-                let nArtikl = a.toLowerCase().replace(/[^a-z0-9]/g, '');
-                let nVstupCisty = nVstup.replace(/[^a-z0-9]/g, '');
-                return nArtikl === nVstupCisty;
-            });
-            if (shoda) return shoda;
-        }
-        return nVstup.toUpperCase();
     }
 
     function zpracujCelýHlas(text) {
-        let t = text.replace(/lomeno/g, "/").replace(/pomlčka|mínus/g, "-");
-        let rKat = "", rPoc = "", rPoz = "";
+        let t = text.replace(/lomeno/g, "/").replace(/hvězdička|hvězda/g, "*").replace(/pomlčka|mínus/g, "-").replace(/tečka/g, ".").replace(/plus/g, "+");
+
+        let rawKat = "", rawPoc = "", rawPoz = "";
         const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
         let rezim = "kat";
 
-        dily.forEach(d => {
-            let s = d.trim();
-            if (s.match(/počet|kusů|kusy/)) { rezim = "poc"; return; }
-            if (s.match(/pozice|pozici/)) { rezim = "poz"; return; }
-            if (rezim === "kat") rKat += s;
-            if (rezim === "poc") rPoc += s;
-            if (rezim === "poz") rPoz += s;
+        dily.forEach(dil => {
+            let d = dil.trim();
+            if (d.match(/počet|kusů|kusy/)) { rezim = "poc"; return; }
+            if (d.match(/pozice|pozici/)) { rezim = "poz"; return; }
+            if (rezim === "kat") rawKat += d;
+            if (rezim === "poc") rawPoc += d;
+            if (rezim === "poz") rawPoz += d;
         });
 
-        let kat = najdiShoduVArtiklech(rKat);
-        pridejRadek(kat, rPoc.replace(/[^\d]/g, ''), rPoz.trim() || fPoz.value);
+        // LOGIKA NUL (PŮVODNÍ)
+        let kat = rawKat.replace(/\s+/g, "");
+        if (kat.match(/^pn|^lm/i)) {
+            kat = kat.replace(/(5)0+/g, "00000").replace(/(4)0+/g, "0000").replace(/(3)0+/g, "000").replace(/(2)0+/g, "00");
+            kat = kat.replace(/nula|nuly|nul/g, "0");
+        }
+        
+        kat = najdiNejlepsiShodu(kat).toUpperCase();
+        let poc = rawPoc.replace(/[^\d]/g, '').trim();
+        let poz = rawPoz.trim() || filtrPozice.value;
+
+        // Pokud jde o doplňování k poslednímu řádku
+        const radky = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+        const posledni = radky[radky.length - 1];
+
+        if (posledni && !kat && (poc || poz)) {
+            if (poc && !posledni.cells[1].innerText) posledni.cells[1].innerText = poc;
+            if (poz && !posledni.cells[2].innerText) posledni.cells[2].innerText = poz;
+            autoUlozeni();
+        } else {
+            if (kat || poc || poz) pridejRadek(kat, poc, poz);
+        }
         window.scrollTo(0, document.body.scrollHeight);
     }
 
@@ -244,18 +250,14 @@
             readerDiv.style.display = 'block';
             html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: { width: 250, height: 150 } }, (decodedText) => {
-                const nalezenyKatalog = barcodeMap[decodedText];
-                if (nalezenyKatalog) {
-                    if (navigator.vibrate) navigator.vibrate(100);
-                    stopScanner();
-                    currentRow = pridejRadek(nalezenyKatalog, "", fPoz.value);
-                    currentStep = "waiting_qty";
-                    showStep();
-                    setTimeout(() => { try { recognition.start(); } catch(e) {} }, 500);
-                } else {
-                    alert("EAN " + decodedText + " neznámý.");
-                    stopScanner();
-                }
+                // Tady by mělo být párování EAN -> Katalog (pokud máš nahrané EANy)
+                // Zatím skenujeme přímo katalogový kód nebo EAN
+                if (navigator.vibrate) navigator.vibrate(100);
+                stopScanner();
+                currentRow = pridejRadek(decodedText.toUpperCase(), "", filtrPozice.value);
+                currentStep = "waiting_qty";
+                showStep();
+                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 500);
             }).catch(e => console.error(e));
             scannerActive = true;
         } else { stopScanner(); }
@@ -270,7 +272,7 @@
         }
     }
 
-    // --- TABULKA A EXPORT ---
+    // --- OSTATNÍ FUNKCE ---
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
@@ -280,28 +282,18 @@
         return r;
     }
 
-    function serad(sloupec, typ) {
-        const radky = Array.from(tbody.rows);
-        const asc = smerRazeni[sloupec];
-        radky.sort((a, b) => {
-            let vA = a.cells[sloupec].innerText.trim();
-            let vB = b.cells[sloupec].innerText.trim();
-            if (typ === 'number') return asc ? parseFloat(vA||0) - parseFloat(vB||0) : parseFloat(vB||0) - parseFloat(vA||0);
-            return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
-        });
-        radky.forEach(r => tbody.appendChild(r));
-        smerRazeni[sloupec] = !asc;
-        document.querySelectorAll('th').forEach((th, i) => th.innerText = th.innerText.replace(/[↕▲▼]/g, '') + (i === sloupec ? (asc ? ' ▲' : ' ▼') : ' ↕'));
-    }
-
     function autoUlozeni() {
         const d = [];
         tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText }));
         localStorage.setItem('skladnikData', JSON.stringify(d));
     }
 
-    function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
-    document.getElementById('btn-smazat').onclick = () => { if (tbody.lastElementChild) { tbody.removeChild(tbody.lastElementChild); autoUlozeni(); } };
+    function vymazatVse() { if (confirm("Smazat celou tabulku?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+
+    document.getElementById('btn-smazat').onclick = () => {
+        const v = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
+        if (v.length > 0) { tbody.removeChild(v[v.length - 1]); autoUlozeni(); }
+    };
 
     document.getElementById('btn-export').onclick = () => {
         let nazev = prompt("Název souboru:", "inventura_" + new Date().toLocaleDateString());
@@ -312,28 +304,19 @@
         a.download = nazev + ".csv"; a.click();
     };
 
-    // --- IMPORTY ---
     document.getElementById('artikl-input').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].replace(/"/g, '').trim()).filter(c => c && c !== "Katalog");
+            const radky = ev.target.result.split('\n');
+            const nove = [];
+            radky.forEach(r => {
+                let c = r.split(',')[0].split(';')[0].replace(/"/g, '').trim();
+                if (c && c !== "Katalog") nove.push(c);
+            });
+            seznamArtiklu = nove;
             localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
             aktualizujStatus();
-        };
-        reader.readAsText(e.target.files[0]);
-    };
-
-    document.getElementById('barcode-input').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const m = {};
-            ev.target.result.split('\n').forEach(r => {
-                const s = r.split(';');
-                if (s.length >= 2) m[s[0].trim()] = s[1].trim();
-            });
-            barcodeMap = m;
-            localStorage.setItem('barcodeMap', JSON.stringify(m));
-            aktualizujStatus();
+            alert(`Nahráno ${nove.length} artiklů!`);
         };
         reader.readAsText(e.target.files[0]);
     };
@@ -351,12 +334,13 @@
         reader.readAsText(e.target.files[0]);
     };
 
-    function aktualizujStatus() { statusBar.innerHTML = `Artikly: ${seznamArtiklu.length} | EANy: ${Object.keys(barcodeMap).length}`; }
+    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů v databázi: ${seznamArtiklu.length} | 💾 Automatické ukládání aktivní`; }
 
     window.onload = () => {
         const u = localStorage.getItem('skladnikData');
         if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
         aktualizujStatus();
+        setTimeout(fixHeader, 500);
     };
 </script>
 </body>
