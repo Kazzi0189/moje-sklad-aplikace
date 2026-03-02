@@ -3,66 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - Final Fix</title>
+    <title>Skladník 1 - Voice Edit Fix</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* FIXOVANÉ ZÁHLAVÍ - OPRAVA */
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
-        thead th { 
-            position: sticky; 
-            z-index: 1000; 
-            background: #444; 
-            color: white; 
-            padding: 12px 5px; 
-            text-align: left; 
-            border: 1px solid #666;
-            top: 0; /* Bude přepsáno JS podle výšky headeru */
-        }
-
         h1 { text-align: center; margin: 5px 0; font-size: 20px; color: #1a1a1a; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
-        #instruction-overlay { font-size: 20px; color: white; background: var(--secondary); text-align: center; padding: 12px; margin: 5px 0; border-radius: 10px; display: none; font-weight: bold; border: 3px solid white; }
+        
+        #instruction-overlay { 
+            font-size: 20px; color: white; background: var(--secondary); 
+            text-align: center; padding: 12px; margin: 5px 0; border-radius: 10px;
+            display: none; font-weight: bold; border: 3px solid white;
+        }
+
         #debug-text { font-size: 13px; color: #555; text-align: center; margin-bottom: 5px; font-style: italic; min-height: 18px; background: #eee; padding: 5px; border-radius: 5px; }
         
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         
-        .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
-        #btn-new { background: var(--success); font-size: 16px; padding: 15px 5px; }
-        #btn-mic { padding: 15px 5px; background: var(--danger); font-size: 16px; }
-        #btn-mic.active { background: #ff7675; animation: pulse 1.5s infinite; }
-        #btn-cancel-mic { display: none; background: #4b4b4b; padding: 0 15px; font-size: 20px; }
-        #btn-scan { padding: 15px 5px; background: #2d3436; font-size: 16px; }
+        .mic-container { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; margin-bottom: 10px; }
+        #btn-mic { padding: 18px; background: var(--danger); font-size: 18px; }
+        #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); }
+        #btn-cancel-mic { display: none; background: #4b4b4b; padding: 0 20px; font-size: 24px; }
+        #btn-scan { padding: 18px; background: #2d3436; font-size: 18px; }
 
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
-        .mrizka button { padding: 8px 4px; font-size: 10px; }
+        .mrizka button { padding: 6px 4px; font-size: 10px; }
         
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .filter-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
         .filtry-container input { padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; border: 2px solid #ccc; }
-        
-        .table-container { width: 100%; max-width: 1200px; }
+        #filtr-katalog { border-color: #f1c40f; background: #fffdf0; padding-right: 40px; }
+        #filtr-pozice { border-color: var(--primary); background: #f0f4ff; }
+        .btn-filter-scan { position: absolute; right: 5px; background: none; color: #333; font-size: 20px; padding: 5px; border: none; cursor: pointer; }
+
+        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2999; }
+        #modal-error {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; z-index: 3000; padding: 20px; border-radius: 15px;
+            width: 90%; max-width: 400px; box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+        .error-title { color: var(--danger); font-weight: bold; font-size: 18px; text-align: center; margin-bottom: 10px; }
+        .shoda-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; }
+
+        .table-container { width: 100%; max-width: 1200px; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; background: white; }
-        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; outline: none; }
         
-        td[contenteditable="true"]:focus { background: #fff9c4 !important; box-shadow: inset 0 0 0 3px var(--primary); }
+        thead th { 
+            position: sticky; z-index: 1000; background: #444; color: white;
+            padding: 12px 5px; text-align: left; border: 1px solid #666; top: 0; cursor: pointer;
+        }
+
+        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; outline: none; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        
+        /* Zvýraznění buňky připravené pro hlasovou opravu */
+        td[contenteditable="true"]:focus { 
+            background: #fff9c4 !important; 
+            box-shadow: inset 0 0 0 3px var(--primary);
+        }
+        
         .new-row { background-color: #e3f2fd !important; border-left: 5px solid var(--primary); }
-        #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); }
+
+        #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); border-radius: 8px; }
+        input[type="file"] { display: none; }
     </style>
 </head>
-<body onclick="manageCellFocus(event)">
+<body>
 
-<div id="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999;"></div>
-<div id="modal-error" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px;">
+<div id="modal-overlay"></div>
+<div id="modal-error">
     <div id="error-content">
-        <div style="color:var(--danger); font-weight:bold; text-align:center;">⚠️ KATALOG NENALEZEN</div>
+        <div class="error-title">⚠️ KATALOG NENALEZEN</div>
         <p id="error-msg" style="text-align:center;"></p>
+        <div style="font-weight:bold; margin-bottom:10px;">Navrhované shody:</div>
         <div id="seznam-navrhu"></div>
-        <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px;">ZADAT ZNOVU</button>
+        <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%">OPRAVIT / ZADAT ZNOVU</button>
     </div>
 </div>
 
@@ -75,10 +95,9 @@
         <div id="reader"></div>
 
         <div class="mic-container">
-            <button id="btn-new" onclick="startNewEntry()">+ NOVÝ</button>
-            <button id="btn-mic" onclick="startRecognition()">🎤 DIKTUJ</button>
-            <button id="btn-cancel-mic" onclick="abortAll()">✕</button>
-            <button id="btn-scan" onclick="toggleMainScanner()">📷 SKEN</button>
+            <button id="btn-mic">🎤 DIKTUJ</button>
+            <button id="btn-cancel-mic">✕</button>
+            <button id="btn-scan">📷 SKEN</button>
         </div>
         
         <div class="mrizka">
@@ -92,11 +111,11 @@
 
         <div class="filtry-container">
             <div class="filter-wrapper">
-                <input type="text" id="filtr-katalog" placeholder="🔍 Filtr Katalog..." oninput="aplikujFiltry()">
-                <button style="position:absolute; right:5px; background:none; color:#333; font-size:20px; border:none;" onclick="startScanToFilter()">📷</button>
+                <input type="text" id="filtr-katalog" placeholder="🔍 Filtr Katalog...">
+                <button class="btn-filter-scan" onclick="startScanToFilter()">📷</button>
             </div>
             <div class="filter-wrapper">
-                <input type="text" id="filtr-pozice" placeholder="🔍 Filtr Pozice..." oninput="aplikujFiltry()">
+                <input type="text" id="filtr-pozice" placeholder="🔍 Filtr Pozice...">
             </div>
         </div>
     </div>
@@ -115,15 +134,17 @@
     </table>
 </div>
 
-<input type="file" id="artikl-input" accept=".csv" style="display:none">
-<input type="file" id="barcode-input" accept=".csv" style="display:none">
-<input type="file" id="work-input" accept=".csv" style="display:none">
+<input type="file" id="artikl-input" accept=".csv">
+<input type="file" id="barcode-input" accept=".csv">
+<input type="file" id="work-input" accept=".csv">
 
 <script>
     const tbody = document.querySelector('#tabulka tbody');
     const statusBar = document.getElementById('status-bar');
     const debugText = document.getElementById('debug-text');
     const overlay = document.getElementById('instruction-overlay');
+    const filtrKatalog = document.getElementById('filtr-katalog');
+    const filtrPozice = document.getElementById('filtr-pozice');
     const btnMic = document.getElementById('btn-mic');
     const btnCancelMic = document.getElementById('btn-cancel-mic');
     
@@ -131,71 +152,103 @@
     let barcodeMap = JSON.parse(localStorage.getItem('barcodeMap')) || {};
     let currentStep = "none"; 
     let currentRow = null;
-    let focusedCell = null; 
-    let isAborting = false;
     let html5QrCode;
     let scannerActive = false;
+    let smerRazeni = [true, true, true];
+    let focusedCell = null; 
 
-    // --- FIX UKOTVENÍ ZÁHLAVÍ (OPRAVENO) ---
-    function updateHeaderPosition() {
-        const headerHeight = document.getElementById('main-header').offsetHeight;
-        document.querySelectorAll('thead th').forEach(th => {
-            th.style.top = (headerHeight - 1) + 'px';
-        });
-    }
-    window.addEventListener('resize', updateHeaderPosition);
-    new ResizeObserver(updateHeaderPosition).observe(document.getElementById('main-header'));
-
-    function manageCellFocus(e) {
-        if (e.target.closest('#btn-mic') || e.target.closest('#btn-cancel-mic')) return;
+    // --- SLEDOVÁNÍ AKTIVNÍ BUŇKY (Vylepšená stabilita) ---
+    document.addEventListener('focusin', (e) => {
         if (e.target.tagName === 'TD' && e.target.hasAttribute('contenteditable')) {
             focusedCell = e.target;
-        } else { focusedCell = null; }
+        }
+    });
+
+    // --- FIX UKOTVENÍ ZÁHLAVÍ ---
+    function fixHeader() {
+        const headerHeight = document.getElementById('main-header').offsetHeight;
+        document.querySelectorAll('thead th').forEach(th => { th.style.top = (headerHeight - 1) + 'px'; });
+    }
+    new ResizeObserver(() => fixHeader()).observe(document.getElementById('main-header'));
+
+    // --- ŘAZENÍ ---
+    function serad(sloupec, typ) {
+        const radky = Array.from(tbody.rows);
+        const asc = smerRazeni[sloupec];
+        radky.sort((a, b) => {
+            let vA = a.cells[sloupec].innerText.trim();
+            let vB = b.cells[sloupec].innerText.trim();
+            if (typ === 'number') return asc ? parseFloat(vA||0) - parseFloat(vB||0) : parseFloat(vB||0) - parseFloat(vA||0);
+            return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        });
+        radky.forEach(r => tbody.appendChild(r));
+        smerRazeni[sloupec] = !asc;
+        autoUlozeni();
     }
 
-    function startNewEntry() { abortAll(); focusedCell = null; startRecognition(); }
-
-    function abortAll() {
-        isAborting = true;
-        recognition.abort();
-        currentStep = "none";
-        showStep();
-        debugText.innerText = "Přerušeno.";
+    function aplikujFiltry() {
+        const vK = filtrKatalog.value.toLowerCase().trim();
+        const vP = filtrPozice.value.toLowerCase().trim();
+        Array.from(tbody.rows).forEach(r => {
+            const matchesK = vK === "" || r.cells[0].innerText.toLowerCase().includes(vK);
+            const matchesP = vP === "" || r.cells[2].innerText.toLowerCase().includes(vP);
+            r.style.display = (matchesK && matchesP) ? '' : 'none';
+        });
     }
+    filtrKatalog.oninput = filtrPozice.oninput = aplikujFiltry;
 
-    // --- HLAS A NULY (OPRAVENO PRO PN01300007) ---
+    // --- HLASOVÉ OVLÁDÁNÍ ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
+    recognition.continuous = false;
+    let isAborting = false;
 
-    function startRecognition() { try { recognition.start(); } catch(e) {} }
+    recognition.onstart = () => { 
+        btnMic.classList.add('active'); 
+        btnMic.innerText = "Slyším..."; 
+        btnCancelMic.style.display = "block";
+        isAborting = false;
+    };
+
+    recognition.onend = () => { 
+        btnMic.classList.remove('active'); 
+        btnMic.innerText = "🎤 DIKTUJ"; 
+        btnCancelMic.style.display = "none";
+        if (currentStep !== "none" && !isAborting) {
+            try { recognition.start(); } catch(e) {}
+        }
+    };
+
+    btnCancelMic.onclick = (e) => {
+        e.preventDefault();
+        isAborting = true;
+        recognition.abort();
+        currentStep = "none";
+        focusedCell = null;
+        showStep();
+        debugText.innerText = "Nahrávání zrušeno.";
+    };
 
     recognition.onresult = (event) => {
         if (isAborting) return;
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
 
-        // 1. Překlad slov na čísla a znaky
-        let t = raw.replace(/pět nul[y]?/g, "00000")
-                   .replace(/čtyři nuly/g, "0000")
-                   .replace(/tři nuly/g, "000")
-                   .replace(/dvě nuly/g, "00")
-                   .replace(/nula/g, "0")
-                   .replace(/lomeno/g, "/")
-                   .replace(/pomlčka|mínus/g, "-")
-                   .replace(/tečka/g, ".")
-                   .replace(/plus/g, "+");
+        // PŘEVOD NUL
+        let t = raw.replace(/pět nul[y]?/g, "00000").replace(/čtyři nuly/g, "0000").replace(/tři nuly/g, "000").replace(/dvě nuly/g, "00")
+                   .replace(/lomeno/g, "/").replace(/pomlčka|mínus/g, "-").replace(/tečka/g, ".").replace(/plus/g, "+");
 
-        // REŽIM OPRAVY
+        // --- REŽIM OPRAVY KONKRÉTNÍ BUŇKY ---
         if (focusedCell) {
             let clean = (focusedCell.cellIndex === 1) ? t.replace(/[^\d]/g, '') : t.replace(/\s/g, '').toUpperCase();
             focusedCell.innerText = clean;
             autoUlozeni();
-            focusedCell = null; 
+            focusedCell = null; // Po opravě vyčistíme
             return;
         }
 
-        // REŽIM NOVÉHO ZÁPISU
+        // --- REŽIM NOVÉHO ZÁPISU ---
         if (currentStep === "waiting_qty") {
             let num = t.replace(/[^\d]/g, '');
             if (num) { currentRow.cells[1].innerText = num; currentStep = "waiting_pos"; showStep(); }
@@ -219,36 +272,46 @@
             if (rezim === "kat") rawKat += d; if (rezim === "poc") rawPoc += d; if (rezim === "poz") rawPoz += d;
         });
 
-        // Vyčištění Katalogu (Důležité pro PN kódy)
         let katText = rawKat.replace(/\s+/g, "").toUpperCase();
+        if (katText.match(/^PN|^LM/i)) {
+            katText = katText.replace(/(5)0+/g, "00000").replace(/(4)0+/g, "0000").replace(/(3)0+/g, "000").replace(/(2)0+/g, "00").replace(/nula|nuly|nul/g, "0");
+        }
 
         let res = najdiShodyAValiduj(katText);
         if (res.stav === 'not_found' && katText.length > 0) {
-            zobrazChybuKatalogu(res, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
+            zobrazChybuKatalogu(res, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || filtrPozice.value);
         } else {
-            dokonciZapis(res.data[0] || katText, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
+            dokonciZapis(res.data[0] || katText, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || filtrPozice.value);
         }
     }
 
     function najdiShodyAValiduj(text) {
         if (!text) return { stav: 'error', data: [] };
-        let hledany = text.replace(/[^A-Z0-9]/g, '').toLowerCase();
-        let presna = seznamArtiklu.find(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase() === hledany);
+        let hledany = text.replace(/\s+/g, '').toLowerCase();
+        let presna = seznamArtiklu.find(a => a.toLowerCase().replace(/[^a-z0-9]/g,'') === hledany.replace(/[^a-z0-9]/g,''));
         if (presna) return { stav: 'ok', data: [presna] };
-        let navrhy = seznamArtiklu.filter(a => a.toLowerCase().includes(text.toLowerCase())).slice(0, 5);
+        let navrhy = seznamArtiklu.filter(a => a.toLowerCase().includes(hledany)).slice(0, 5);
         return { stav: 'not_found', data: navrhy, puvodni: text };
     }
 
-    // --- DOPLŇKOVÉ FUNKCE (Skenování, Filtry, Export) ---
-    function aplikujFiltry() {
-        const vK = document.getElementById('filtr-katalog').value.toLowerCase().trim();
-        const vP = document.getElementById('filtr-pozice').value.toLowerCase().trim();
-        Array.from(tbody.rows).forEach(r => {
-            const matchesK = vK === "" || r.cells[0].innerText.toLowerCase().includes(vK);
-            const matchesP = vP === "" || r.cells[2].innerText.toLowerCase().includes(vP);
-            r.style.display = (matchesK && matchesP) ? '' : 'none';
+    function zobrazChybuKatalogu(vysledek, puvodniPocet, puvodniPozice) {
+        const modal = document.getElementById('modal-error');
+        const overlayM = document.getElementById('modal-overlay');
+        const box = document.getElementById('seznam-navrhu');
+        document.getElementById('error-msg').innerText = `Kód "${vysledek.puvodni}" nenalezen.`;
+        box.innerHTML = "";
+        vysledek.data.forEach(s => {
+            let div = document.createElement('div');
+            div.className = "shoda-item";
+            div.innerHTML = `<span>${s}</span> <span>➔</span>`;
+            div.onclick = () => { zavriModal(); dokonciZapis(s, puvodniPocet, puvodniPozice); };
+            box.appendChild(div);
         });
+        modal.style.display = "block"; overlayM.style.display = "block";
     }
+
+    function zavriModalOpravit() { zavriModal(); try { recognition.start(); } catch(e) {} }
+    function zavriModal() { document.getElementById('modal-error').style.display = "none"; document.getElementById('modal-overlay').style.display = "none"; }
 
     function dokonciZapis(kat, poc, poz) {
         currentRow = pridejRadek(kat, poc, poz);
@@ -262,6 +325,7 @@
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
         tbody.prepend(r);
         r.classList.add('new-row');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         if (u) autoUlozeni();
         return r;
     }
@@ -278,25 +342,37 @@
         if (currentStep === "waiting_pos") overlay.innerText = "🎤 ŘEKNĚTE POZICI";
     }
 
-    function toggleMainScanner() {
+    function startScanToFilter() {
+        const readerDiv = document.getElementById('reader');
+        readerDiv.style.display = 'block';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+            stopScanner();
+            filtrKatalog.value = barcodeMap[decodedText] || decodedText.toUpperCase();
+            aplikujFiltry();
+        });
+    }
+
+    document.getElementById('btn-scan').onclick = () => {
+        const readerDiv = document.getElementById('reader');
         if (!scannerActive) {
-            document.getElementById('reader').style.display = 'block';
+            readerDiv.style.display = 'block';
             html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
                 stopScanner();
                 let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
                 let res = najdiShodyAValiduj(kat);
-                if (res.stav === 'not_found') zobrazChybuKatalogu(res, "", document.getElementById('filtr-pozice').value);
-                else dokonciZapis(res.data[0], "", document.getElementById('filtr-pozice').value);
+                if (res.stav === 'not_found') zobrazChybuKatalogu(res, "", filtrPozice.value);
+                else dokonciZapis(res.data[0], "", filtrPozice.value);
             });
             scannerActive = true;
         } else { stopScanner(); }
-    }
+    };
 
     function stopScanner() { if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; scannerActive = false; }); }
-
     function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
-    
+    document.getElementById('btn-smazat').onclick = () => { if (tbody.rows.length > 0) { tbody.removeChild(tbody.rows[0]); autoUlozeni(); } };
+
     document.getElementById('btn-export').onclick = () => {
         let csv = "\ufeffKatalog;Počet;Pozice\n";
         tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}"\n`);
@@ -304,17 +380,49 @@
         a.download = 'inventura.csv'; a.click();
     };
 
-    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
-    
-    recognition.onstart = () => { btnMic.classList.add('active'); btnCancelMic.style.display = "block"; isAborting = false; };
-    recognition.onend = () => { btnMic.classList.remove('active'); btnCancelMic.style.display = "none"; if (currentStep !== "none" && !isAborting) startRecognition(); };
+    document.getElementById('artikl-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].trim()).filter(c => c && c !== "Katalog");
+            localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
+            aktualizujStatus(); alert("Artikly nahrány.");
+        };
+        reader.readAsText(e.target.files[0]);
+    };
 
+    document.getElementById('barcode-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const m = {};
+            ev.target.result.split('\n').forEach(r => { const s = r.split(';'); if (s.length >= 2) m[s[0].trim()] = s[1].trim(); });
+            barcodeMap = m; localStorage.setItem('barcodeMap', JSON.stringify(m));
+            aktualizujStatus(); alert("EANy nahrány.");
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    document.getElementById('work-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            ev.target.result.split('\n').forEach((r, i) => {
+                if (i === 0 || !r.trim()) return;
+                const s = r.split(';');
+                if (s.length >= 3) pridejRadek(s[0].replace(/"/g, ""), s[1].replace(/"/g, ""), s[2].replace(/"/g, ""), false);
+            });
+            autoUlozeni();
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
+    btnMic.onclick = () => { try { recognition.start(); } catch(e) {} };
+    
     window.onload = () => {
         const u = localStorage.getItem('skladnikData');
         if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
         tbody.querySelectorAll('tr').forEach(r => r.classList.remove('new-row'));
         aktualizujStatus();
-        setTimeout(updateHeaderPosition, 500);
+        setTimeout(fixHeader, 500);
     };
 </script>
 </body>
