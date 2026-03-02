@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - Voice Edit</title>
+    <title>Skladník 1 - Voice Edit Fix</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -25,9 +25,8 @@
         
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         
-        /* Ovládání mikrofonu se zrušením */
-        .mic-container { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 10px; }
-        #btn-mic { padding: 18px; background: var(--danger); font-size: 18px; width: 100%; }
+        .mic-container { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; margin-bottom: 10px; }
+        #btn-mic { padding: 18px; background: var(--danger); font-size: 18px; }
         #btn-mic.active { background: var(--success); box-shadow: 0 0 15px var(--success); }
         #btn-cancel-mic { display: none; background: #4b4b4b; padding: 0 20px; font-size: 24px; }
         #btn-scan { padding: 18px; background: #2d3436; font-size: 18px; }
@@ -59,9 +58,14 @@
             padding: 12px 5px; text-align: left; border: 1px solid #666; top: 0; cursor: pointer;
         }
 
-        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; }
+        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; outline: none; }
         tr:nth-child(even) { background: #f9f9f9; }
-        td[contenteditable="true"]:focus { background: #fff9c4; outline: 3px solid var(--primary); }
+        
+        /* Zvýraznění buňky připravené pro hlasovou opravu */
+        td[contenteditable="true"]:focus { 
+            background: #fff9c4 !important; 
+            box-shadow: inset 0 0 0 3px var(--primary);
+        }
         
         .new-row { background-color: #e3f2fd !important; border-left: 5px solid var(--primary); }
 
@@ -92,7 +96,7 @@
 
         <div class="mic-container">
             <button id="btn-mic">🎤 DIKTUJ</button>
-            <button id="btn-cancel-mic" title="Zrušit nahrávání">✕</button>
+            <button id="btn-cancel-mic">✕</button>
             <button id="btn-scan">📷 SKEN</button>
         </div>
         
@@ -151,15 +155,12 @@
     let html5QrCode;
     let scannerActive = false;
     let smerRazeni = [true, true, true];
-    let focusedCell = null; // Sleduje, zda uživatel klikl do tabulky
+    let focusedCell = null; 
 
-    // --- SLEDOVÁNÍ AKTIVNÍ BUŇKY ---
+    // --- SLEDOVÁNÍ AKTIVNÍ BUŇKY (Vylepšená stabilita) ---
     document.addEventListener('focusin', (e) => {
         if (e.target.tagName === 'TD' && e.target.hasAttribute('contenteditable')) {
             focusedCell = e.target;
-        } else {
-            // Malá prodleva, aby stihl proběhnout click na mikrofon dřív, než se focusedCell vynuluje
-            setTimeout(() => { if (document.activeElement.tagName !== 'TD') focusedCell = null; }, 200);
         }
     });
 
@@ -220,10 +221,11 @@
     };
 
     btnCancelMic.onclick = (e) => {
-        e.stopPropagation();
+        e.preventDefault();
         isAborting = true;
         recognition.abort();
         currentStep = "none";
+        focusedCell = null;
         showStep();
         debugText.innerText = "Nahrávání zrušeno.";
     };
@@ -233,20 +235,20 @@
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = '🤖 Slyšeno: "' + raw + '"';
 
-        // PŘEVOD NUL (pro oba režimy)
+        // PŘEVOD NUL
         let t = raw.replace(/pět nul[y]?/g, "00000").replace(/čtyři nuly/g, "0000").replace(/tři nuly/g, "000").replace(/dvě nuly/g, "00")
                    .replace(/lomeno/g, "/").replace(/pomlčka|mínus/g, "-").replace(/tečka/g, ".").replace(/plus/g, "+");
 
-        // REŽIM OPRAVY KONKRÉTNÍ BUŇKY
+        // --- REŽIM OPRAVY KONKRÉTNÍ BUŇKY ---
         if (focusedCell) {
             let clean = (focusedCell.cellIndex === 1) ? t.replace(/[^\d]/g, '') : t.replace(/\s/g, '').toUpperCase();
             focusedCell.innerText = clean;
             autoUlozeni();
-            focusedCell = null;
+            focusedCell = null; // Po opravě vyčistíme
             return;
         }
 
-        // REŽIM NOVÉHO ZÁPISU
+        // --- REŽIM NOVÉHO ZÁPISU ---
         if (currentStep === "waiting_qty") {
             let num = t.replace(/[^\d]/g, '');
             if (num) { currentRow.cells[1].innerText = num; currentStep = "waiting_pos"; showStep(); }
@@ -318,7 +320,6 @@
         else { currentRow.classList.remove('new-row'); }
     }
 
-    // --- OSTATNÍ FUNKCE ---
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
         r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
