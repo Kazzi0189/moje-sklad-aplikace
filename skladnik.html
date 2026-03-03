@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - Master Voice Fix</title>
+    <title>Skladník 1 - Ultra Voice</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* DYNAMICKÉ UKOTVENÍ ZÁHLAVÍ */
+        /* FIXOVANÉ ZÁHLAVÍ - VŽDY NAHOŘE */
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
@@ -25,17 +25,18 @@
 
         h1 { text-align: center; margin: 5px 0; font-size: 20px; color: #1a1a1a; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
-        #debug-text { font-size: 13px; color: #555; text-align: center; margin-bottom: 5px; font-style: italic; min-height: 18px; background: #eee; padding: 5px; border-radius: 5px; }
-        #instruction-overlay { font-size: 20px; color: white; background: var(--secondary); text-align: center; padding: 12px; margin: 5px 0; border-radius: 10px; display: none; font-weight: bold; border: 3px solid white; }
+        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 18px; background: #fff3e0; padding: 5px; border-radius: 5px; border: 1px solid #ffe0b2; }
         
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         
         .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
-        #btn-new { background: var(--success); font-size: 16px; padding: 15px 5px; border: 2px solid #1b8e51; }
+        #btn-new { background: var(--success); font-size: 16px; padding: 15px 5px; }
         #btn-mic { padding: 15px 5px; background: var(--danger); font-size: 16px; }
         #btn-mic.active { background: #ff7675; animation: pulse 1.5s infinite; }
         #btn-cancel-mic { display: none; background: #4b4b4b; padding: 0 15px; font-size: 20px; }
         #btn-scan { padding: 15px 5px; background: #2d3436; font-size: 16px; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 8px 4px; font-size: 10px; }
@@ -43,8 +44,8 @@
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .filter-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
         .filtry-container input { padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; border: 2px solid #ccc; }
-        #filtr-katalog { border-color: #f1c40f; background: #fffdf0; }
-        .btn-filter-scan { position: absolute; right: 5px; background: none; color: #333; font-size: 20px; border: none; }
+        #filtr-katalog { border-color: #f1c40f; background: #fffdf0; padding-right: 40px; }
+        .btn-filter-scan { position: absolute; right: 5px; background: none; color: #333; font-size: 20px; border: none; padding: 5px; cursor: pointer; }
 
         .table-container { width: 100%; max-width: 1200px; }
         table { width: 100%; border-collapse: collapse; background: white; }
@@ -56,16 +57,14 @@
         input[type="file"] { display: none; }
     </style>
 </head>
-<body onclick="manageCellFocus(event)">
+<body onclick="manageFocus(event)">
 
 <div id="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999;"></div>
 <div id="modal-error" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px;">
-    <div id="error-content">
-        <div style="color:var(--danger); font-weight:bold; text-align:center;">⚠️ KATALOG NENALEZEN</div>
-        <p id="error-msg" style="text-align:center;"></p>
-        <div id="seznam-navrhu"></div>
-        <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px;">ZADAT ZNOVU</button>
-    </div>
+    <div style="color:var(--danger); font-weight:bold; text-align:center;">⚠️ KATALOG NENALEZEN</div>
+    <p id="error-msg" style="text-align:center;"></p>
+    <div id="seznam-navrhu"></div>
+    <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px;">ZADAT ZNOVU</button>
 </div>
 
 <div class="header-sticky" id="main-header">
@@ -135,16 +134,16 @@
     let isAborting = false;
     let html5QrCode;
 
-    // --- FIX UKOTVENÍ ---
+    // --- FIX UKOTVENÍ ZÁHLAVÍ ---
     function updateHeaderPosition() {
-        const h = document.getElementById('main-header').offsetHeight;
-        document.querySelectorAll('thead th').forEach(th => th.style.top = (h - 1) + 'px');
+        const headerHeight = document.getElementById('main-header').offsetHeight;
+        document.querySelectorAll('thead th').forEach(th => th.style.top = (headerHeight - 1) + 'px');
     }
     new ResizeObserver(updateHeaderPosition).observe(document.getElementById('main-header'));
 
-    // --- LOGIKA FOKUSU (OPRAVENO) ---
-    function manageCellFocus(e) {
-        if (e.target.closest('button')) return;
+    // --- LOGIKA OPRAVA VS NOVÝ ---
+    function manageFocus(e) {
+        if (e.target.closest('#btn-mic') || e.target.closest('#btn-cancel-mic')) return;
         if (e.target.tagName === 'TD' && e.target.hasAttribute('contenteditable')) {
             focusedCell = e.target;
         } else {
@@ -154,7 +153,7 @@
 
     function startNewEntry() {
         abortAll();
-        focusedCell = null; 
+        focusedCell = null;
         document.activeElement.blur(); 
         startRecognition();
     }
@@ -166,29 +165,32 @@
         debugText.innerText = "Slyšeno: -";
     }
 
-    // --- HLAS A DEKODÉR NUL ---
+    // --- HLASOVÉ OVLÁDÁNÍ A CHYTRÝ PŘEVODNÍK ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
+    recognition.interimResults = false;
 
     recognition.onresult = (event) => {
         if (isAborting) return;
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = 'Slyšeno: "' + raw + '"';
 
-        // Robustní převod slov/číslic na nuly (PN02000068, DRT006/24 atd.)
-        let t = raw.replace(/(pět|5)\s*nul[y]?/g, "00000")
-                   .replace(/(čtyři|4)\s*nul[y]?/g, "0000")
-                   .replace(/(tři|3)\s*nul[y]?/g, "000")
-                   .replace(/(dvě|2)\s*nul[y]?/g, "00")
+        // 1. KROK: ČIŠTĚNÍ FONETICKÝCH CHYB (PM -> PN) A NUL
+        let t = raw.replace(/pm/g, "PN")
+                   .replace(/pe en/g, "PN")
+                   .replace(/de er te/g, "DRT")
+                   .replace(/(?:čtyři|4)\s*nul[yae]/g, "0000")
+                   .replace(/(?:tři|3)\s*nul[yae]/g, "000")
+                   .replace(/(?:dvě|2)\s*nul[yae]/g, "00")
                    .replace(/nula/g, "0")
                    .replace(/lomeno/g, "/")
-                   .replace(/pé en/g, "PN")
-                   .replace(/el em/g, "LM")
-                   .replace(/dé er té/g, "DRT")
                    .replace(/\s+/g, "");
 
-        // 1. PRIORITA: Pokud je vybraná buňka, oprav jen ji
+        // 2. KROK: SPECIÁLNÍ OPRAVA PRO "PN0240" -> "PN020000" (pokud telefon slyšel 40 místo 4 nuly)
+        if (t.includes("PN0240")) t = t.replace("PN0240", "PN020000");
+
+        // PRIORITA: OPRAVA BUŇKY
         if (focusedCell) {
             let final = (focusedCell.cellIndex === 1) ? t.replace(/[^\d]/g, '') : t.toUpperCase();
             focusedCell.innerText = final;
@@ -196,7 +198,7 @@
             return;
         }
 
-        // 2. PRIORITA: Nový zápis
+        // DOPLNĚNÍ KROKŮ
         if (currentStep === "waiting_qty") {
             let num = t.replace(/[^\d]/g, '');
             if (num) { currentRow.cells[1].innerText = num; currentStep = "waiting_pos"; }
@@ -205,11 +207,12 @@
             currentRow.classList.remove('new-row');
             autoUlozeni(); currentStep = "none";
         } else { 
-            zpracujHlas(t); 
+            // NOVÝ ZÁPIS + SAMOOPRAVA (FUZZY MATCH)
+            zpracujHlasSeSamoopravou(t); 
         }
     };
 
-    function zpracujHlas(t) {
+    function zpracujHlasSeSamoopravou(t) {
         let rawKat = "", rawPoc = "", rawPoz = "";
         const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
         let rezim = "kat";
@@ -221,22 +224,30 @@
         });
 
         let kat = rawKat.toUpperCase();
-        let res = najdiShodyAValiduj(kat);
         
-        if (res.stav === 'not_found' && kat.length > 0) {
-            zobrazChybuKatalogu(res, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
-        } else {
-            dokonciZapis(res.data[0] || kat, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
+        // --- CHYTRÉ POROVNÁNÍ (Zkusíme najít artikl, i když je tam drobná chyba) ---
+        let finalKat = kat;
+        let hledanyKatalog = kat.replace(/[^A-Z0-9]/g, '').toLowerCase();
+        
+        // Zkusíme najít přesnou shodu nebo artikl, který se liší jen o kousek
+        let nalezenaShoda = seznamArtiklu.find(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase() === hledanyKatalog);
+        
+        if (!nalezenaShoda) {
+            // Pokud nenajdeme přesně, zkusíme najít artikl, který "obsahuje" to, co jsme slyšeli
+            nalezenaShoda = seznamArtiklu.find(a => a.toLowerCase().includes(kat.toLowerCase()));
         }
-    }
 
-    function najdiShodyAValiduj(text) {
-        if (!text) return { stav: 'error', data: [] };
-        let hledany = text.replace(/[^A-Z0-9]/g, '').toLowerCase();
-        let presna = seznamArtiklu.find(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase() === hledany);
-        if (presna) return { stav: 'ok', data: [presna] };
-        let navrhy = seznamArtiklu.filter(a => a.toLowerCase().includes(text.toLowerCase())).slice(0, 5);
-        return { stav: 'not_found', data: navrhy, puvodni: text };
+        if (nalezenaShoda) {
+            finalKat = nalezenaShoda;
+            debugText.innerText += " -> Opraveno na: " + finalKat;
+        } else if (kat.length > 0) {
+            // Pokud nic nenajdeme, ukážeme návrhy jako předtím
+            let navrhy = seznamArtiklu.filter(a => a.toLowerCase().includes(kat.toLowerCase())).slice(0, 5);
+            zobrazChybuKatalogu({puvodni: kat, data: navrhy}, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
+            return;
+        }
+
+        dokonciZapis(finalKat, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
     }
 
     // --- SKENOVÁNÍ DO FILTRU ---
@@ -256,8 +267,7 @@
         html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
             stopScanner();
             let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
-            let res = najdiShodyAValiduj(kat);
-            dokonciZapis(res.data[0] || kat, "", document.getElementById('filtr-pozice').value);
+            dokonciZapis(kat, "", document.getElementById('filtr-pozice').value);
         });
     }
 
@@ -319,6 +329,27 @@
     function startRecognition() { try { recognition.start(); } catch(e) {} }
     recognition.onstart = () => { btnMic.classList.add('active'); btnCancelMic.style.display = "block"; isAborting = false; };
     recognition.onend = () => { btnMic.classList.remove('active'); btnCancelMic.style.display = "none"; if (currentStep !== "none" && !isAborting) startRecognition(); };
+
+    // --- IMPORTY ---
+    document.getElementById('artikl-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].trim()).filter(c => c && c !== "Katalog");
+            localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu));
+            aktualizujStatus();
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    document.getElementById('barcode-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            ev.target.result.split('\n').forEach(r => { const d = r.split(';'); if(d[1]) barcodeMap[d[1].trim()] = d[0].trim(); });
+            localStorage.setItem('barcodeMap', JSON.stringify(barcodeMap));
+            aktualizujStatus();
+        };
+        reader.readAsText(e.target.files[0]);
+    };
 
     function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
 
