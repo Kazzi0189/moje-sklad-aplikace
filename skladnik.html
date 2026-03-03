@@ -9,6 +9,9 @@
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
+        /* FIX: Skrytí ošklivých inputů pro soubory */
+        input[type="file"] { display: none; }
+
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
@@ -41,7 +44,6 @@
         table { width: 100%; border-collapse: collapse; background: white; table-layout: fixed; }
         td { border: 1px solid var(--border-color); padding: 12px 8px; font-size: 15px; outline: none; word-wrap: break-word; }
         
-        /* Skrytý sloupec výpočtu */
         .col-calc { display: none; background: #f9f9f9; font-style: italic; color: #666; font-size: 13px; }
 
         td[contenteditable="true"]:focus { background: #fff9c4 !important; box-shadow: inset 0 0 0 3px var(--primary); }
@@ -195,29 +197,22 @@
 
     function zpracujVypocetPoctu(vstup) {
         let s = vstup.toLowerCase();
-        // Odstranění "balastu"
         const noise = ["krabice", "krabic", "balení", "balíků", "balíky", "beden", "bedny", "kusů", "kusy", "kus"];
         noise.forEach(n => s = s.split(n).join(""));
-
-        // Nahrazení operátorů
         s = s.replace(/po|krát|x/g, "*");
         s = s.replace(/plus|a/g, "+");
         s = s.replace(/mínus/g, "-");
-        s = s.replace(/,/g, "."); // Desetinné čárky
-
-        // Vytažení pouze čísel a operátorů
+        s = s.replace(/,/g, ".");
         let cleanFormula = s.replace(/[^0-9*+\-./]/g, "");
         
         try {
             if (cleanFormula === "") throw "Empty";
             let result = eval(cleanFormula);
             if (isNaN(result)) throw "NaN";
-
             pendingCalc = { result: Math.round(result * 100) / 100, formula: cleanFormula };
             currentStep = "confirm_qty";
             debugText.innerHTML = `VÝPOČET: <span style="color:blue">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Souhlasí? (řekněte ANO / OK)`;
         } catch (e) {
-            // Pokud to není vzorec, zkusíme jestli je to jen prosté číslo
             let jenCislo = vstup.replace(/[^\d]/g, '');
             if (jenCislo) {
                 pendingCalc = { result: jenCislo, formula: jenCislo };
