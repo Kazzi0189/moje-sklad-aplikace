@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - AI Zero Master (Logic Fix v2)</title>
+    <title>Skladník 1 - AI Inventory Master (Calc Edition)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -12,11 +12,11 @@
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         
-        thead th { position: sticky; z-index: 1000; background: #444; color: white; padding: 12px 5px; text-align: left; border: 1px solid #666; }
+        thead th { position: sticky; z-index: 1000; background: #444; color: white; padding: 12px 5px; text-align: left; border: 1px solid #666; font-size: 14px; }
 
         h1 { text-align: center; margin: 5px 0; font-size: 18px; color: #1a1a1a; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
-        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 22px; background: #fff3e0; padding: 5px; border-radius: 5px; border: 1px solid #ffe0b2; }
+        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 22px; background: #fff3e0; padding: 5px; border-radius: 5px; border: 1px solid #ffe0b2; line-height: 1.4; }
         
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
@@ -28,7 +28,7 @@
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
-        .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 8px; }
+        .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 8px 4px; font-size: 10px; }
         
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
@@ -38,17 +38,18 @@
         .btn-filter-scan { position: absolute; right: 5px; background: none; color: #333; font-size: 20px; border: none; padding: 5px; cursor: pointer; }
 
         .table-container { width: 100%; max-width: 1200px; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        td { border: 1px solid var(--border-color); padding: 12px 10px; font-size: 16px; outline: none; }
+        table { width: 100%; border-collapse: collapse; background: white; table-layout: fixed; }
+        td { border: 1px solid var(--border-color); padding: 12px 8px; font-size: 15px; outline: none; word-wrap: break-word; }
+        
+        /* Skrytý sloupec výpočtu */
+        .col-calc { display: none; background: #f9f9f9; font-style: italic; color: #666; font-size: 13px; }
+
         td[contenteditable="true"]:focus { background: #fff9c4 !important; box-shadow: inset 0 0 0 3px var(--primary); }
         .new-row { background-color: #e3f2fd !important; border-left: 5px solid var(--primary); }
         
-        /* SKENER MODAL LOGIKA */
         #reader-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 5000; flex-direction: column; align-items: center; justify-content: center; }
         #reader { width: 90%; max-width: 500px; border: 2px solid white; }
         #btn-stop-scan { margin-top: 20px; background: var(--danger); padding: 15px 30px; font-size: 18px; border-radius: 10px; }
-
-        input[type="file"] { display: none; }
 
         #modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999; }
         #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; }
@@ -71,7 +72,7 @@
 
 <div class="header-sticky" id="main-header">
     <div class="header-content">
-        <h1>Skladník 1 - AI Zero Master (Logic Fix v2) 📦</h1>
+        <h1>Skladník 1 - AI Inventory Master (Calc Edition) 📦</h1>
         <div id="status-bar">Načítání...</div>
         <div id="debug-text">Slyšeno: -</div>
 
@@ -87,6 +88,7 @@
             <button style="background:#00b894" onclick="document.getElementById('barcode-input').click()">🏷️ EANy</button>
             <button style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 ROZDĚLANÉ</button>
             <button id="btn-smazat" style="background:#fa8231" onclick="smazatPosledni()">🗑️ SMAZAT 1.</button>
+            <button id="btn-calc-toggle" style="background:#26de81; color:#333;" onclick="toggleCalcColumn()">📊 VÝPOČTY</button>
             <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT</button>
             <button style="background:#4b4b4b" onclick="vymazatVse()">🧨 VYMAZAT</button>
         </div>
@@ -107,9 +109,10 @@
     <table id="tabulka">
         <thead>
             <tr>
-                <th style="width:50%">Katalog ↕</th>
-                <th style="width:20%">Počet ↕</th>
-                <th style="width:30%">Pozice ↕</th>
+                <th style="width:35%">Katalog</th>
+                <th style="width:15%">Počet</th>
+                <th style="width:25%">Pozice</th>
+                <th class="col-calc" style="width:25%">Výpočet</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -134,6 +137,7 @@
     let focusedCell = null; 
     let isAborting = false;
     let html5QrCode;
+    let pendingCalc = { result: 0, formula: "" };
 
     function updateHeaderPosition() {
         const h = document.getElementById('main-header').offsetHeight;
@@ -149,7 +153,6 @@
     function startNewEntry() { abortAll(); focusedCell = null; document.activeElement.blur(); startRecognition(); }
     function abortAll() { isAborting = true; recognition.abort(); currentStep = "none"; debugText.innerText = "Slyšeno: -"; }
 
-    // --- LOGIKA HLASU ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
@@ -169,11 +172,16 @@
         }
 
         if (currentStep === "waiting_qty") {
-            let num = t.replace(/[^\d]/g, '');
-            if (num) { 
-                currentRow.cells[1].innerText = num; 
+            zpracujVypocetPoctu(raw);
+        } else if (currentStep === "confirm_qty") {
+            if (raw.includes("ano") || raw.includes("jo") || raw.includes("ok") || raw.includes("správně") || raw.includes("potvrdit")) {
+                currentRow.cells[1].innerText = pendingCalc.result;
+                currentRow.cells[3].innerText = pendingCalc.formula;
                 currentStep = "waiting_pos";
-                debugText.innerText = "Teď pozici...";
+                debugText.innerText = "Uloženo: " + pendingCalc.result + ". Teď pozici...";
+            } else {
+                debugText.innerText = "Zkuste zadat počet znovu...";
+                currentStep = "waiting_qty";
             }
         } else if (currentStep === "waiting_pos") {
             currentRow.cells[2].innerText = t.toUpperCase();
@@ -185,22 +193,54 @@
         }
     };
 
+    function zpracujVypocetPoctu(vstup) {
+        let s = vstup.toLowerCase();
+        // Odstranění "balastu"
+        const noise = ["krabice", "krabic", "balení", "balíků", "balíky", "beden", "bedny", "kusů", "kusy", "kus"];
+        noise.forEach(n => s = s.split(n).join(""));
+
+        // Nahrazení operátorů
+        s = s.replace(/po|krát|x/g, "*");
+        s = s.replace(/plus|a/g, "+");
+        s = s.replace(/mínus/g, "-");
+        s = s.replace(/,/g, "."); // Desetinné čárky
+
+        // Vytažení pouze čísel a operátorů
+        let cleanFormula = s.replace(/[^0-9*+\-./]/g, "");
+        
+        try {
+            if (cleanFormula === "") throw "Empty";
+            let result = eval(cleanFormula);
+            if (isNaN(result)) throw "NaN";
+
+            pendingCalc = { result: Math.round(result * 100) / 100, formula: cleanFormula };
+            currentStep = "confirm_qty";
+            debugText.innerHTML = `VÝPOČET: <span style="color:blue">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Souhlasí? (řekněte ANO / OK)`;
+        } catch (e) {
+            // Pokud to není vzorec, zkusíme jestli je to jen prosté číslo
+            let jenCislo = vstup.replace(/[^\d]/g, '');
+            if (jenCislo) {
+                pendingCalc = { result: jenCislo, formula: jenCislo };
+                currentStep = "confirm_qty";
+                debugText.innerHTML = `Počet: <span style="color:blue">${jenCislo}</span>. OK?`;
+            }
+        }
+    }
+
     function overVstupAValiduj(vstup) {
         let kat = vstup.toUpperCase();
         if (seznamArtiklu.includes(kat)) { dokonciZapis(kat); return; }
-
         let zkouskaNul = kat.replace(/(\d)([2-9])0/g, (match, p1, p2) => p1 + "0".repeat(parseInt(p2)));
         if (seznamArtiklu.includes(zkouskaNul)) { dokonciZapis(zkouskaNul); return; }
-
         let hledanyKoren = kat.replace(/[^A-Z0-9]/g, '').toLowerCase();
         let shody = seznamArtiklu.filter(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase().includes(hledanyKoren));
         zobrazNavrhy(shody, kat);
     }
 
     function dokonciZapis(kat) {
-        currentRow = pridejRadek(kat, "", document.getElementById('filtr-pozice').value);
+        currentRow = pridejRadek(kat, "", document.getElementById('filtr-pozice').value, "");
         currentStep = "waiting_qty";
-        debugText.innerText = "Zadejte počet...";
+        debugText.innerText = "Zadejte počet (např. 10 po 20)...";
     }
 
     function zobrazNavrhy(list, puvodni) {
@@ -208,7 +248,7 @@
         const title = document.getElementById('modal-title');
         if (list.length === 0) {
             title.innerText = `⚠️ KÓD ${puvodni} NENALEZEN`;
-            box.innerHTML = `<div style="padding:15px; text-align:center;">Artikl není v seznamu. Zkuste znovu.</div>`;
+            box.innerHTML = `<div style="padding:15px; text-align:center;">Artikl není v seznamu.</div>`;
         } else {
             title.innerText = `📦 VYBERTE SPRÁVNÝ KÓD`;
             list.slice(0, 20).forEach(s => {
@@ -221,7 +261,12 @@
         document.getElementById('modal-overlay').style.display = "block";
     }
 
-    // --- SKENER ---
+    function toggleCalcColumn() {
+        const show = document.querySelector('.col-calc').style.display === 'table-cell';
+        document.querySelectorAll('.col-calc').forEach(el => el.style.display = show ? 'none' : 'table-cell');
+        document.getElementById('btn-calc-toggle').innerText = show ? '📊 VÝPOČTY' : '👁️ SKRÝT';
+    }
+
     function toggleMainScanner() {
         document.getElementById('reader-container').style.display = 'flex';
         html5QrCode = new Html5Qrcode("reader");
@@ -229,25 +274,24 @@
             stopScanner();
             let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
             overVstupAValiduj(kat);
-        }).catch(err => { console.error(err); stopScanner(); });
+        }).catch(err => stopScanner());
     }
 
     function stopScanner() {
         if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                document.getElementById('reader-container').style.display = 'none';
-            }).catch(() => {
-                document.getElementById('reader-container').style.display = 'none';
-            });
-        } else {
-            document.getElementById('reader-container').style.display = 'none';
-        }
+            html5QrCode.stop().then(() => { document.getElementById('reader-container').style.display = 'none'; }).catch(() => { document.getElementById('reader-container').style.display = 'none'; });
+        } else { document.getElementById('reader-container').style.display = 'none'; }
     }
 
-    // --- TABULKA ---
-    function pridejRadek(k="", p="", z="", u=true) {
+    function pridejRadek(k="", p="", z="", c="", u=true) {
         const r = document.createElement('tr');
-        r.innerHTML = `<td contenteditable="true">${k}</td><td contenteditable="true">${p}</td><td contenteditable="true">${z}</td>`;
+        const showStyle = document.querySelector('.col-calc').style.display === 'table-cell' ? 'table-cell' : 'none';
+        r.innerHTML = `
+            <td contenteditable="true">${k}</td>
+            <td contenteditable="true">${p}</td>
+            <td contenteditable="true">${z}</td>
+            <td class="col-calc" style="display:${showStyle}">${c}</td>
+        `;
         tbody.prepend(r);
         r.classList.add('new-row');
         if (u) autoUlozeni();
@@ -255,17 +299,12 @@
     }
 
     function smazatPosledni() {
-        if (tbody.rows.length > 0) {
-            if (confirm("Opravdu smazat poslední zadaný řádek?")) {
-                tbody.deleteRow(0);
-                autoUlozeni();
-            }
-        }
+        if (tbody.rows.length > 0 && confirm("Smazat poslední řádek?")) { tbody.deleteRow(0); autoUlozeni(); }
     }
 
     function autoUlozeni() {
-        const d = []; tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText }));
-        localStorage.setItem('skladnikData', JSON.stringify(d));
+        const d = []; tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText, c: tr.cells[3].innerText }));
+        localStorage.setItem('skladnikDataCalc', JSON.stringify(d));
     }
 
     function aplikujFiltry() {
@@ -288,13 +327,13 @@
 
     function zavriModal() { document.getElementById('modal-error').style.display = "none"; document.getElementById('modal-overlay').style.display = "none"; }
     function zavriModalOpravit() { zavriModal(); currentStep = "none"; startRecognition(); }
-    function vymazatVse() { if (confirm("Smazat úplně všechna data?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
+    function vymazatVse() { if (confirm("Smazat úplně všechna data?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikDataCalc'); } }
     
     document.getElementById('btn-export').onclick = () => {
-        let csv = "\ufeffKatalog;Počet;Pozice\n";
-        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}"\n`);
+        let csv = "\ufeffKatalog;Počet;Pozice;Výpočet\n";
+        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`);
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        a.download = 'inventura.csv'; a.click();
+        a.download = 'inventura_vypocet.csv'; a.click();
     };
 
     function startRecognition() { try { recognition.start(); } catch(e) {} }
@@ -327,8 +366,8 @@
     function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
 
     window.onload = () => {
-        const u = localStorage.getItem('skladnikData');
-        if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, false));
+        const u = localStorage.getItem('skladnikDataCalc');
+        if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, p.c || "", false));
         tbody.querySelectorAll('tr').forEach(r => r.classList.remove('new-row'));
         aktualizujStatus();
     };
