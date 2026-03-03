@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - AI Zero Master (Final Fix)</title>
+    <title>Skladník 1 - AI Zero Master (Logic Fix)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -16,7 +16,7 @@
 
         h1 { text-align: center; margin: 5px 0; font-size: 18px; color: #1a1a1a; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
-        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 18px; background: #fff3e0; padding: 5px; border-radius: 5px; border: 1px solid #ffe0b2; }
+        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 22px; background: #fff3e0; padding: 5px; border-radius: 5px; border: 1px solid #ffe0b2; }
         
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
@@ -45,24 +45,23 @@
         #reader { width: 100%; max-width: 500px; margin: 5px auto; display: none; border: 4px solid var(--primary); }
         input[type="file"] { display: none; }
 
-        /* MODAL */
         #modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999; }
         #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; }
-        .navrh-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; cursor: pointer; color: var(--primary); }
+        .navrh-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; cursor: pointer; color: var(--primary); font-size: 18px; }
     </style>
 </head>
 <body onclick="manageFocus(event)">
 
 <div id="modal-overlay"></div>
 <div id="modal-error">
-    <div style="color:var(--danger); font-weight:bold; text-align:center; margin-bottom:10px;">📦 VYBERTE KATALOG</div>
+    <div id="modal-title" style="color:var(--danger); font-weight:bold; text-align:center; margin-bottom:10px;">📦 VYBERTE KATALOG</div>
     <div id="seznam-navrhu"></div>
-    <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px;">ZRUŠIT / ZADAT ZNOVU</button>
+    <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px;">ZADAT ZNOVU</button>
 </div>
 
 <div class="header-sticky" id="main-header">
     <div class="header-content">
-        <h1>Skladník 1 - AI Zero Master (Final Fix) 📦</h1>
+        <h1>Skladník 1 - AI Zero Master (Logic Fix) 📦</h1>
         <div id="status-bar">Načítání...</div>
         <div id="debug-text">Slyšeno: -</div>
         <div id="reader"></div>
@@ -138,13 +137,9 @@
         focusedCell = (e.target.tagName === 'TD' && e.target.hasAttribute('contenteditable')) ? e.target : null;
     }
 
-    function startNewEntry() {
-        abortAll(); focusedCell = null; document.activeElement.blur(); startRecognition();
-    }
-
+    function startNewEntry() { abortAll(); focusedCell = null; document.activeElement.blur(); startRecognition(); }
     function abortAll() { isAborting = true; recognition.abort(); currentStep = "none"; debugText.innerText = "Slyšeno: -"; }
 
-    // --- LOGIKA HLASU ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
@@ -155,21 +150,14 @@
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = 'Slyšeno: "' + raw + '"';
 
-        // 1. ČIŠTĚNÍ TEXTU
         let t = raw.replace(/pm/g, "PN").replace(/pe en/g, "PN").replace(/de er te/g, "DRT")
                    .replace(/lomeno/g, "/").replace(/nula/g, "0").replace(/\s+/g, "");
 
-        // 2. NULOVÝ EXPANDÉR (Oprava chyby 40 -> 0000)
-        // Pokud slyšíme PN0240, zkusíme to převést na PN020000 atd.
-        t = t.replace(/(\d)([2-9])0/g, (match, p1, p2) => p1 + "0".repeat(parseInt(p2)));
-
-        // PRIORITA: OPRAVA BUŇKY
         if (focusedCell) {
             focusedCell.innerText = (focusedCell.cellIndex === 1) ? t.replace(/[^\d]/g, '') : t.toUpperCase();
             autoUlozeni(); return;
         }
 
-        // DOPLNĚNÍ KROKŮ (POČET -> POZICE)
         if (currentStep === "waiting_qty") {
             let num = t.replace(/[^\d]/g, '');
             if (num) { 
@@ -181,75 +169,66 @@
             currentRow.cells[2].innerText = t.toUpperCase();
             currentRow.classList.remove('new-row');
             autoUlozeni(); currentStep = "none";
+            debugText.innerText = "Hotovo. Další?";
         } else { 
-            zpracujVstup(t); 
+            overVstupAValiduj(t); 
         }
     };
 
-    function zpracujVstup(t) {
-        let rawKat = "", rawPoc = "", rawPoz = "";
-        const dily = t.split(/(počet|kusů|kusy|pozice|pozici)/);
-        let rezim = "kat";
-        dily.forEach(dil => {
-            let d = dil.trim();
-            if (d.match(/počet|kusů|kusy/)) { rezim = "poc"; return; }
-            if (d.match(/pozice|pozici/)) { rezim = "poz"; return; }
-            if (rezim === "kat") rawKat += d; if (rezim === "poc") rawPoc += d; if (rezim === "poz") rawPoz += d;
-        });
+    function overVstupAValiduj(vstup) {
+        let kat = vstup.toUpperCase();
+        
+        // 1. Zkusíme přímou shodu
+        if (seznamArtiklu.includes(kat)) {
+            dokonciZapis(kat);
+            return;
+        }
 
-        let kat = rawKat.toUpperCase();
-        let hledany = kat.replace(/[^A-Z0-9]/g, '').toLowerCase();
-        
-        // Hledáme všechny shody (kvůli DRT030)
-        let shody = seznamArtiklu.filter(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase().includes(hledany));
-        
-        // Pokud je přesná shoda jen jedna, vezmeme ji. Pokud jich je víc, musíme dát vybrat.
-        if (shody.length === 1 && shody[0].replace(/[^A-Z0-9]/g,'').toLowerCase() === hledany) {
-            dokonciZapis(shody[0], rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
-        } else if (shody.length > 0) {
-            zobrazNavrhy(shody, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
+        // 2. CHYTRÝ EXPANDÉR (Opravuje PN71505 na PN71000005 jen pokud existuje)
+        let zkouskaNul = kat.replace(/(\d)([2-9])0/g, (match, p1, p2) => p1 + "0".repeat(parseInt(p2)));
+        if (seznamArtiklu.includes(zkouskaNul)) {
+            debugText.innerText = "Opraveno na: " + zkouskaNul;
+            dokonciZapis(zkouskaNul);
+            return;
+        }
+
+        // 3. HLEDÁNÍ VARIANT (DRT030 -> DRT030/12, DRT030/24)
+        let hledanyKoren = kat.replace(/[^A-Z0-9]/g, '').toLowerCase();
+        let shody = seznamArtiklu.filter(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase().includes(hledanyKoren));
+
+        if (shody.length > 0) {
+            zobrazNavrhy(shody, kat);
         } else {
-            dokonciZapis(kat, rawPoc.replace(/[^\d]/g, ''), rawPoz.trim() || document.getElementById('filtr-pozice').value);
+            // Pokud není ani v shodech, kód NEZAPISUJEME a žádáme o opravu
+            zobrazNavrhy([], kat);
         }
     }
 
-    function dokonciZapis(kat, poc, poz) {
-        currentRow = pridejRadek(kat, poc, poz);
-        if (!poc) { 
-            currentStep = "waiting_qty"; 
-            debugText.innerText = "Zadejte počet...";
-        } else if (!poz) { 
-            currentStep = "waiting_pos"; 
-            debugText.innerText = "Zadejte pozici...";
-        } else { 
-            currentRow.classList.remove('new-row'); 
-            currentStep = "none";
-        }
+    function dokonciZapis(kat) {
+        currentRow = pridejRadek(kat, "", document.getElementById('filtr-pozice').value);
+        currentStep = "waiting_qty";
+        debugText.innerText = "Zadejte počet...";
+        // Automatický restart pro počet se děje v recognition.onend
     }
 
-    function zobrazNavrhy(list, poc, poz) {
+    function zobrazNavrhy(list, puvodni) {
         const box = document.getElementById('seznam-navrhu'); box.innerHTML = "";
-        list.slice(0, 15).forEach(s => {
-            let d = document.createElement('div'); d.className = "navrh-item";
-            d.innerText = s; d.onclick = () => { zavriModal(); dokonciZapis(s, poc, poz); };
-            box.appendChild(d);
-        });
+        const title = document.getElementById('modal-title');
+        
+        if (list.length === 0) {
+            title.innerText = `⚠️ KÓD ${puvodni} NENALEZEN`;
+            box.innerHTML = `<div style="padding:15px; text-align:center;">Tento artikl není v seznamu. Zkuste ho nadiktovat znovu nebo zkontrolovat.</div>`;
+        } else {
+            title.innerText = `📦 VYBERTE SPRÁVNÝ KÓD`;
+            list.slice(0, 20).forEach(s => {
+                let d = document.createElement('div'); d.className = "navrh-item";
+                d.innerText = s; d.onclick = () => { zavriModal(); dokonciZapis(s); };
+                box.appendChild(d);
+            });
+        }
         document.getElementById('modal-error').style.display = "block";
         document.getElementById('modal-overlay').style.display = "block";
     }
-
-    function toggleMainScanner() {
-        document.getElementById('reader').style.display = 'block';
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
-            stopScanner();
-            let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
-            // Po skenu taky chceme počet a pozici
-            dokonciZapis(kat, "", document.getElementById('filtr-pozice').value);
-        });
-    }
-
-    function stopScanner() { if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; }); }
 
     function pridejRadek(k="", p="", z="", u=true) {
         const r = document.createElement('tr');
@@ -259,6 +238,18 @@
         if (u) autoUlozeni();
         return r;
     }
+
+    function toggleMainScanner() {
+        document.getElementById('reader').style.display = 'block';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+            stopScanner();
+            let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
+            overVstupAValiduj(kat);
+        });
+    }
+
+    function stopScanner() { if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; }); }
 
     function autoUlozeni() {
         const d = []; tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText }));
@@ -284,7 +275,7 @@
     }
 
     function zavriModal() { document.getElementById('modal-error').style.display = "none"; document.getElementById('modal-overlay').style.display = "none"; }
-    function zavriModalOpravit() { zavriModal(); currentStep = "none"; }
+    function zavriModalOpravit() { zavriModal(); currentStep = "none"; startRecognition(); }
     function vymazatVse() { if (confirm("Smazat vše?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikData'); } }
     
     document.getElementById('btn-export').onclick = () => {
@@ -298,7 +289,7 @@
     recognition.onstart = () => { btnMic.classList.add('active'); btnCancelMic.style.display = "block"; isAborting = false; };
     recognition.onend = () => { 
         btnMic.classList.remove('active'); btnCancelMic.style.display = "none"; 
-        if (currentStep !== "none" && !isAborting) { setTimeout(startRecognition, 300); } 
+        if (currentStep !== "none" && !isAborting) { setTimeout(startRecognition, 400); } 
     };
 
     document.getElementById('artikl-input').onchange = (e) => {
