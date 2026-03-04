@@ -9,7 +9,7 @@
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* FIX: Skrytí ošklivých inputů pro soubory */
+        /* Skrytí systémových inputů pro soubory */
         input[type="file"] { display: none; }
 
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
@@ -19,9 +19,11 @@
 
         h1 { text-align: center; margin: 5px 0; font-size: 18px; color: #1a1a1a; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
-        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 22px; background: #fff3e0; padding: 5px; border-radius: 5px; border: 1px solid #ffe0b2; line-height: 1.4; }
+        #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 44px; background: #fff3e0; padding: 8px; border-radius: 5px; border: 1px solid #ffe0b2; line-height: 1.4; display: flex; align-items: center; justify-content: center; }
         
-        button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
+        button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+
         .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
         #btn-new { background: var(--success); font-size: 16px; padding: 15px 5px; }
         #btn-mic { padding: 15px 5px; background: var(--danger); font-size: 16px; }
@@ -31,8 +33,8 @@
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
-        .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; margin-bottom: 8px; }
-        .mrizka button { padding: 8px 4px; font-size: 10px; }
+        .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 6px; margin-bottom: 8px; }
+        .mrizka button { padding: 10px 4px; font-size: 10px; text-transform: uppercase; }
         
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .filter-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
@@ -44,7 +46,8 @@
         table { width: 100%; border-collapse: collapse; background: white; table-layout: fixed; }
         td { border: 1px solid var(--border-color); padding: 12px 8px; font-size: 15px; outline: none; word-wrap: break-word; }
         
-        .col-calc { display: none; background: #f9f9f9; font-style: italic; color: #666; font-size: 13px; }
+        /* 4. sloupec - Výpočet (výchozí stav: skrytý) */
+        .col-calc { display: none; background: #f1f2f6; color: #57606f; font-style: italic; font-size: 13px; }
 
         td[contenteditable="true"]:focus { background: #fff9c4 !important; box-shadow: inset 0 0 0 3px var(--primary); }
         .new-row { background-color: #e3f2fd !important; border-left: 5px solid var(--primary); }
@@ -54,17 +57,18 @@
         #btn-stop-scan { margin-top: 20px; background: var(--danger); padding: 15px 30px; font-size: 18px; border-radius: 10px; }
 
         #modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999; }
-        #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; }
-        .navrh-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; cursor: pointer; color: var(--primary); font-size: 18px; }
+        #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .navrh-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; cursor: pointer; color: var(--primary); font-size: 18px; text-align: center; }
+        .navrh-item:active { background: #f1f2f6; }
     </style>
 </head>
 <body onclick="manageFocus(event)">
 
 <div id="modal-overlay"></div>
 <div id="modal-error">
-    <div id="modal-title" style="color:var(--danger); font-weight:bold; text-align:center; margin-bottom:10px;">📦 VYBERTE KATALOG</div>
+    <div id="modal-title" style="color:var(--danger); font-weight:bold; text-align:center; margin-bottom:10px; font-size: 18px;">📦 VYBERTE KATALOG</div>
     <div id="seznam-navrhu"></div>
-    <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px;">ZADAT ZNOVU</button>
+    <button onclick="zavriModalOpravit()" style="margin-top:20px; background:var(--primary); padding:15px; width:100%; color:white; border-radius:10px; font-size: 16px;">ZADAT ZNOVU</button>
 </div>
 
 <div id="reader-container">
@@ -89,9 +93,9 @@
             <button style="background:#4b6584" onclick="document.getElementById('artikl-input').click()">📖 ARTIKLY</button>
             <button style="background:#00b894" onclick="document.getElementById('barcode-input').click()">🏷️ EANy</button>
             <button style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 ROZDĚLANÉ</button>
-            <button id="btn-smazat" style="background:#fa8231" onclick="smazatPosledni()">🗑️ SMAZAT 1.</button>
-            <button id="btn-calc-toggle" style="background:#26de81; color:#333;" onclick="toggleCalcColumn()">📊 VÝPOČTY</button>
+            <button id="btn-calc-toggle" style="background:#26de81; color:#1e272e;" onclick="toggleCalcColumn()">📊 VÝPOČTY</button>
             <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT</button>
+            <button style="background:#fa8231" onclick="smazatPosledni()">🗑️ SMAZAT 1.</button>
             <button style="background:#4b4b4b" onclick="vymazatVse()">🧨 VYMAZAT</button>
         </div>
 
@@ -165,6 +169,7 @@
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = 'Slyšeno: "' + raw + '"';
 
+        // Základní nahrazení pro Artikly a Pozice (Logic Fix v2 core)
         let t = raw.replace(/pm/g, "PN").replace(/pe en/g, "PN").replace(/de er te/g, "DRT")
                    .replace(/lomeno/g, "/").replace(/nula/g, "0").replace(/\s+/g, "");
 
@@ -173,51 +178,70 @@
             autoUlozeni(); return;
         }
 
+        // --- STAVOVÝ AUTOMAT ---
         if (currentStep === "waiting_qty") {
-            zpracujVypocetPoctu(raw);
-        } else if (currentStep === "confirm_qty") {
-            if (raw.includes("ano") || raw.includes("jo") || raw.includes("ok") || raw.includes("správně") || raw.includes("potvrdit")) {
-                currentRow.cells[1].innerText = pendingCalc.result;
+            zpracujVypocetHlasem(raw);
+        } 
+        else if (currentStep === "confirm_qty") {
+            if (raw.includes("ano") || raw.includes("ok") || raw.includes("jo") || raw.includes("správně") || raw.includes("potvrdit") || /^\d+$/.test(t)) {
+                // Pokud uživatel řekl nové číslo místo OK, zapiš to číslo, jinak zapiš výsledek
+                let finalVal = /^\d+$/.test(t) ? t : pendingCalc.result;
+                currentRow.cells[1].innerText = finalVal;
                 currentRow.cells[3].innerText = pendingCalc.formula;
                 currentStep = "waiting_pos";
-                debugText.innerText = "Uloženo: " + pendingCalc.result + ". Teď pozici...";
+                debugText.innerText = "Uloženo: " + finalVal + ". Teď pozici...";
             } else {
                 debugText.innerText = "Zkuste zadat počet znovu...";
                 currentStep = "waiting_qty";
             }
-        } else if (currentStep === "waiting_pos") {
+        } 
+        else if (currentStep === "waiting_pos") {
             currentRow.cells[2].innerText = t.toUpperCase();
             currentRow.classList.remove('new-row');
             autoUlozeni(); currentStep = "none";
             debugText.innerText = "Hotovo. Další?";
-        } else { 
+        } 
+        else { 
             overVstupAValiduj(t); 
         }
     };
 
-    function zpracujVypocetPoctu(vstup) {
+    function zpracujVypocetHlasem(vstup) {
         let s = vstup.toLowerCase();
+        
+        // 1. Ignorování balastu
         const noise = ["krabice", "krabic", "balení", "balíků", "balíky", "beden", "bedny", "kusů", "kusy", "kus"];
         noise.forEach(n => s = s.split(n).join(""));
+
+        // 2. Mapování operátorů (Důležité: nahrazení slovy dříve než smazání mezer)
         s = s.replace(/po|krát|x/g, "*");
         s = s.replace(/plus|a/g, "+");
         s = s.replace(/mínus/g, "-");
+        s = s.replace(/lomeno/g, "/");
         s = s.replace(/,/g, ".");
+
+        // 3. Extrakce čistého vzorce (pouze čísla a operátory)
         let cleanFormula = s.replace(/[^0-9*+\-./]/g, "");
         
         try {
-            if (cleanFormula === "") throw "Empty";
+            if (!cleanFormula || !/[\d]/.test(cleanFormula)) throw "No math";
+            
+            // Výpočet (eval je v tomto izolovaném kontextu bezpečný)
             let result = eval(cleanFormula);
             if (isNaN(result)) throw "NaN";
-            pendingCalc = { result: Math.round(result * 100) / 100, formula: cleanFormula };
+
+            pendingCalc = { result: Math.round(result * 100) / 100, formula: cleanFormula.replace(/\*/g, 'x') };
             currentStep = "confirm_qty";
-            debugText.innerHTML = `VÝPOČET: <span style="color:blue">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Souhlasí? (řekněte ANO / OK)`;
+            debugText.innerHTML = `VÝPOČET: <span style="color:blue; font-size:16px;">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Potvrďte slovem OK nebo dalším číslem.`;
         } catch (e) {
+            // Pokud selže matematika, zkusíme jestli to není jen jedno číslo
             let jenCislo = vstup.replace(/[^\d]/g, '');
             if (jenCislo) {
                 pendingCalc = { result: jenCislo, formula: jenCislo };
                 currentStep = "confirm_qty";
-                debugText.innerHTML = `Počet: <span style="color:blue">${jenCislo}</span>. OK?`;
+                debugText.innerHTML = `POČET: <span style="color:blue; font-size:16px;">${jenCislo}</span>. Souhlasí? (řekněte OK)`;
+            } else {
+                debugText.innerText = "Nerozuměla jsem počtu. Zkuste znovu (např. 10 po 20).";
             }
         }
     }
@@ -225,8 +249,12 @@
     function overVstupAValiduj(vstup) {
         let kat = vstup.toUpperCase();
         if (seznamArtiklu.includes(kat)) { dokonciZapis(kat); return; }
+        
+        // Logic Fix v2 - Oprava nul
         let zkouskaNul = kat.replace(/(\d)([2-9])0/g, (match, p1, p2) => p1 + "0".repeat(parseInt(p2)));
         if (seznamArtiklu.includes(zkouskaNul)) { dokonciZapis(zkouskaNul); return; }
+        
+        // Vyhledávání shody
         let hledanyKoren = kat.replace(/[^A-Z0-9]/g, '').toLowerCase();
         let shody = seznamArtiklu.filter(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase().includes(hledanyKoren));
         zobrazNavrhy(shody, kat);
@@ -243,10 +271,10 @@
         const title = document.getElementById('modal-title');
         if (list.length === 0) {
             title.innerText = `⚠️ KÓD ${puvodni} NENALEZEN`;
-            box.innerHTML = `<div style="padding:15px; text-align:center;">Artikl není v seznamu.</div>`;
+            box.innerHTML = `<div style="padding:15px; text-align:center;">Artikl není v nahraném seznamu.</div>`;
         } else {
             title.innerText = `📦 VYBERTE SPRÁVNÝ KÓD`;
-            list.slice(0, 20).forEach(s => {
+            list.slice(0, 25).forEach(s => {
                 let d = document.createElement('div'); d.className = "navrh-item";
                 d.innerText = s; d.onclick = () => { zavriModal(); dokonciZapis(s); };
                 box.appendChild(d);
@@ -257,30 +285,14 @@
     }
 
     function toggleCalcColumn() {
-        const show = document.querySelector('.col-calc').style.display === 'table-cell';
-        document.querySelectorAll('.col-calc').forEach(el => el.style.display = show ? 'none' : 'table-cell');
-        document.getElementById('btn-calc-toggle').innerText = show ? '📊 VÝPOČTY' : '👁️ SKRÝT';
-    }
-
-    function toggleMainScanner() {
-        document.getElementById('reader-container').style.display = 'flex';
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
-            stopScanner();
-            let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
-            overVstupAValiduj(kat);
-        }).catch(err => stopScanner());
-    }
-
-    function stopScanner() {
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => { document.getElementById('reader-container').style.display = 'none'; }).catch(() => { document.getElementById('reader-container').style.display = 'none'; });
-        } else { document.getElementById('reader-container').style.display = 'none'; }
+        const currentlyHidden = (document.querySelector('.col-calc').style.display === 'none' || document.querySelector('.col-calc').style.display === '');
+        document.querySelectorAll('.col-calc').forEach(el => el.style.display = currentlyHidden ? 'table-cell' : 'none');
+        document.getElementById('btn-calc-toggle').innerText = currentlyHidden ? '👁️ SKRÝT' : '📊 VÝPOČTY';
     }
 
     function pridejRadek(k="", p="", z="", c="", u=true) {
         const r = document.createElement('tr');
-        const showStyle = document.querySelector('.col-calc').style.display === 'table-cell' ? 'table-cell' : 'none';
+        const showStyle = (document.getElementById('btn-calc-toggle').innerText === '👁️ SKRÝT') ? 'table-cell' : 'none';
         r.innerHTML = `
             <td contenteditable="true">${k}</td>
             <td contenteditable="true">${p}</td>
@@ -293,14 +305,47 @@
         return r;
     }
 
-    function smazatPosledni() {
-        if (tbody.rows.length > 0 && confirm("Smazat poslední řádek?")) { tbody.deleteRow(0); autoUlozeni(); }
+    function autoUlozeni() {
+        const d = []; 
+        tbody.querySelectorAll('tr').forEach(tr => {
+            d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText, c: tr.cells[3].innerText });
+        });
+        localStorage.setItem('skladnikDataCalcFinal', JSON.stringify(d));
     }
 
-    function autoUlozeni() {
-        const d = []; tbody.querySelectorAll('tr').forEach(tr => d.push({ k: tr.cells[0].innerText, p: tr.cells[1].innerText, z: tr.cells[2].innerText, c: tr.cells[3].innerText }));
-        localStorage.setItem('skladnikDataCalc', JSON.stringify(d));
+    document.getElementById('btn-export').onclick = () => {
+        let csv = "\ufeffKatalog;Počet;Pozice;Výpočet\n";
+        tbody.querySelectorAll('tr').forEach(tr => {
+            csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `inventura_${new Date().toLocaleDateString()}.csv`; a.click();
+    };
+
+    function toggleMainScanner() {
+        document.getElementById('reader-container').style.display = 'flex';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+            stopScanner();
+            let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
+            overVstupAValiduj(kat);
+        }).catch(err => stopScanner());
     }
+
+    function stopScanner() {
+        if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader-container').style.display = 'none'; }).catch(() => { document.getElementById('reader-container').style.display = 'none'; });
+        else document.getElementById('reader-container').style.display = 'none';
+    }
+
+    function smazatPosledni() { if (tbody.rows.length > 0 && confirm("Smazat poslední řádek?")) { tbody.deleteRow(0); autoUlozeni(); } }
+    function vymazatVse() { if (confirm("Smazat ÚPLNĚ VŠE?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikDataCalcFinal'); } }
+    function zavriModal() { document.getElementById('modal-error').style.display = "none"; document.getElementById('modal-overlay').style.display = "none"; }
+    function zavriModalOpravit() { zavriModal(); currentStep = "none"; startRecognition(); }
+
+    function startRecognition() { try { recognition.start(); } catch(e) {} }
+    recognition.onstart = () => { btnMic.classList.add('active'); btnCancelMic.style.display = "block"; isAborting = false; };
+    recognition.onend = () => { btnMic.classList.remove('active'); btnCancelMic.style.display = "none"; if (currentStep !== "none" && !isAborting) setTimeout(startRecognition, 400); };
 
     function aplikujFiltry() {
         const vK = document.getElementById('filtr-katalog').value.toLowerCase();
@@ -309,34 +354,6 @@
             r.style.display = (r.cells[0].innerText.toLowerCase().includes(vK) && r.cells[2].innerText.toLowerCase().includes(vP)) ? '' : 'none';
         });
     }
-
-    function startScanToFilter() {
-        document.getElementById('reader-container').style.display = 'flex';
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
-            stopScanner();
-            document.getElementById('filtr-katalog').value = barcodeMap[decodedText] || decodedText.toUpperCase();
-            aplikujFiltry();
-        }).catch(err => stopScanner());
-    }
-
-    function zavriModal() { document.getElementById('modal-error').style.display = "none"; document.getElementById('modal-overlay').style.display = "none"; }
-    function zavriModalOpravit() { zavriModal(); currentStep = "none"; startRecognition(); }
-    function vymazatVse() { if (confirm("Smazat úplně všechna data?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikDataCalc'); } }
-    
-    document.getElementById('btn-export').onclick = () => {
-        let csv = "\ufeffKatalog;Počet;Pozice;Výpočet\n";
-        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`);
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        a.download = 'inventura_vypocet.csv'; a.click();
-    };
-
-    function startRecognition() { try { recognition.start(); } catch(e) {} }
-    recognition.onstart = () => { btnMic.classList.add('active'); btnCancelMic.style.display = "block"; isAborting = false; };
-    recognition.onend = () => { 
-        btnMic.classList.remove('active'); btnCancelMic.style.display = "none"; 
-        if (currentStep !== "none" && !isAborting) { setTimeout(startRecognition, 400); } 
-    };
 
     document.getElementById('artikl-input').onchange = (e) => {
         const reader = new FileReader();
@@ -361,7 +378,7 @@
     function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
 
     window.onload = () => {
-        const u = localStorage.getItem('skladnikDataCalc');
+        const u = localStorage.getItem('skladnikDataCalcFinal');
         if (u) JSON.parse(u).forEach(p => pridejRadek(p.k, p.p, p.z, p.c || "", false));
         tbody.querySelectorAll('tr').forEach(r => r.classList.remove('new-row'));
         aktualizujStatus();
