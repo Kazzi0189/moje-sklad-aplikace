@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - AI Inventory Master (Calc Edition)</title>
+    <title>Skladník 1 - FIX 3</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
@@ -12,7 +12,7 @@
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
         thead th { position: sticky; z-index: 1000; background: #444; color: white; padding: 12px 5px; text-align: left; border: 1px solid #666; font-size: 14px; }
-        h1 { text-align: center; margin: 5px 0; font-size: 18px; color: #1a1a1a; }
+        h1 { text-align: center; margin: 5px 0; font-size: 16px; color: #1a1a1a; line-height: 1.2; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
         #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 44px; background: #fff3e0; padding: 8px; border-radius: 5px; border: 1px solid #ffe0b2; line-height: 1.4; display: flex; align-items: center; justify-content: center; }
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s; }
@@ -62,7 +62,7 @@
 
 <div class="header-sticky" id="main-header">
     <div class="header-content">
-        <h1>Skladník 1 - AI Inventory Master (Calc Edition) 📦</h1>
+        <h1>Skladník 1 - AI Inventory Master (Calc Edition) - FIX 3 📦</h1>
         <div id="status-bar">Načítání...</div>
         <div id="debug-text">Slyšeno: -</div>
 
@@ -78,7 +78,7 @@
             <button style="background:#00b894" onclick="document.getElementById('barcode-input').click()">🏷️ EANy</button>
             <button style="background:var(--secondary)" onclick="document.getElementById('work-input').click()">📂 ROZDĚLANÉ</button>
             <button id="btn-calc-toggle" style="background:#26de81; color:#1e272e;" onclick="toggleCalcColumn()">📊 VÝPOČTY</button>
-            <button id="btn-export" style="background:var(--primary)">💾 ULOŽIT</button>
+            <button id="btn-export" style="background:var(--primary)" onclick="exportSFilename()">💾 ULOŽIT</button>
             <button style="background:#fa8231" onclick="smazatPosledni()">🗑️ SMAZAT 1.</button>
             <button style="background:#4b4b4b" onclick="vymazatVse()">🧨 VYMAZAT</button>
         </div>
@@ -156,19 +156,18 @@
         let t = raw.replace(/pm/g, "PN").replace(/pe en/g, "PN").replace(/de er te/g, "DRT")
                    .replace(/lomeno/g, "/").replace(/nula/g, "0").replace(/\s+/g, "");
 
-        // FIX: Mikrofon pro filtr pozice
         if (currentStep === "waiting_filter_pos") {
             document.getElementById('filtr-pozice').value = t.toUpperCase();
             aplikujFiltry(); currentStep = "none"; return;
         }
 
-        // FIX: Kalkulačka pro editaci existující buňky POČET
-        if (focusedCell && focusedCell.cellIndex === 1) {
-            zpracujVypocetHlasem(raw, true);
+        // Kalkulačka při editaci buňky POČET
+        if (focusedCell && focusedCell.cellIndex === 1 && currentStep === "none") {
+            zpracujVypocetHlasem(raw);
             return;
         }
 
-        if (focusedCell) {
+        if (focusedCell && currentStep !== "confirm_qty") {
             focusedCell.innerText = t.toUpperCase();
             autoUlozeni(); return;
         }
@@ -180,12 +179,12 @@
             if (raw.includes("ano") || raw.includes("ok") || raw.includes("jo") || raw.includes("správně") || raw.includes("potvrdit") || /^\d+$/.test(t)) {
                 let finalVal = /^\d+$/.test(t) ? t : pendingCalc.result;
                 
-                // Zápis buď do aktivního řádku nebo do fokusované buňky
                 if (focusedCell) {
                     focusedCell.innerText = finalVal;
-                    let r = focusedCell.parentElement;
-                    r.cells[3].innerText = pendingCalc.formula;
+                    focusedCell.parentElement.cells[3].innerText = pendingCalc.formula;
                     focusedCell = null; document.activeElement.blur();
+                    currentStep = "none"; // FIX: Ukončení cyklu po potvrzení OK
+                    debugText.innerText = "Změna uložena.";
                 } else {
                     currentRow.cells[1].innerText = finalVal;
                     currentRow.cells[3].innerText = pendingCalc.formula;
@@ -204,7 +203,7 @@
         else { overVstupAValiduj(t); }
     };
 
-    function zpracujVypocetHlasem(vstup, isEditing = false) {
+    function zpracujVypocetHlasem(vstup) {
         let s = vstup.toLowerCase();
         const noise = ["krabice", "krabic", "balení", "balíků", "balíky", "beden", "bedny", "kusů", "kusy", "kus"];
         noise.forEach(n => s = s.split(n).join(""));
@@ -243,7 +242,6 @@
         currentRow = pridejRadek(kat, "", document.getElementById('filtr-pozice').value, "");
         currentStep = "waiting_qty";
         debugText.innerText = "Zadejte počet (např. 10 po 20)...";
-        // FIX: Automatické zapnutí mikrofonu po skenu/výběru artiklu
         setTimeout(() => startRecognition(), 600);
     }
 
@@ -264,28 +262,25 @@
         }).catch(err => stopScanner());
     }
 
-    // --- Zbytek logiky zůstává stejný ---
     function stopScanner() {
         if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader-container').style.display = 'none'; }).catch(() => { document.getElementById('reader-container').style.display = 'none'; });
         else document.getElementById('reader-container').style.display = 'none';
     }
 
-    function zobrazNavrhy(list, puvodni) {
-        const box = document.getElementById('seznam-navrhu'); box.innerHTML = "";
-        const title = document.getElementById('modal-title');
-        if (list.length === 0) {
-            title.innerText = `⚠️ KÓD ${puvodni} NENALEZEN`;
-            box.innerHTML = `<div style="padding:15px; text-align:center;">Artikl není v seznamu.</div>`;
-        } else {
-            title.innerText = `📦 VYBERTE SPRÁVNÝ KÓD`;
-            list.slice(0, 25).forEach(s => {
-                let d = document.createElement('div'); d.className = "navrh-item";
-                d.innerText = s; d.onclick = () => { zavriModal(); dokonciZapis(s); };
-                box.appendChild(d);
-            });
-        }
-        document.getElementById('modal-error').style.display = "block";
-        document.getElementById('modal-overlay').style.display = "block";
+    function exportSFilename() {
+        let defaultName = `inventura_${new Date().toLocaleDateString().replace(/\s/g, '')}`;
+        let fileName = prompt("Zadejte název souboru:", defaultName);
+        if (!fileName) return; 
+        
+        let csv = "\ufeffKatalog;Počet;Pozice;Výpočet\n";
+        tbody.querySelectorAll('tr').forEach(tr => {
+            csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(blob);
+        a.download = `${fileName}.csv`; 
+        a.click();
     }
 
     function toggleCalcColumn() {
@@ -309,12 +304,23 @@
         localStorage.setItem('skladnikDataCalcFinal', JSON.stringify(d));
     }
 
-    document.getElementById('btn-export').onclick = () => {
-        let csv = "\ufeffKatalog;Počet;Pozice;Výpočet\n";
-        tbody.querySelectorAll('tr').forEach(tr => csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`);
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        a.download = `inventura_${new Date().toLocaleDateString()}.csv`; a.click();
-    };
+    function zobrazNavrhy(list, puvodni) {
+        const box = document.getElementById('seznam-navrhu'); box.innerHTML = "";
+        const title = document.getElementById('modal-title');
+        if (list.length === 0) {
+            title.innerText = `⚠️ KÓD ${puvodni} NENALEZEN`;
+            box.innerHTML = `<div style="padding:15px; text-align:center;">Artikl není v seznamu.</div>`;
+        } else {
+            title.innerText = `📦 VYBERTE SPRÁVNÝ KÓD`;
+            list.slice(0, 25).forEach(s => {
+                let d = document.createElement('div'); d.className = "navrh-item";
+                d.innerText = s; d.onclick = () => { zavriModal(); dokonciZapis(s); };
+                box.appendChild(d);
+            });
+        }
+        document.getElementById('modal-error').style.display = "block";
+        document.getElementById('modal-overlay').style.display = "block";
+    }
 
     document.getElementById('work-input').onchange = (e) => {
         const reader = new FileReader();
@@ -361,7 +367,7 @@
         }).catch(err => stopScanner());
     }
 
-    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANy: ${Object.keys(barcodeMap).length}`; }
+    function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
 
     window.onload = () => {
         const u = localStorage.getItem('skladnikDataCalcFinal');
