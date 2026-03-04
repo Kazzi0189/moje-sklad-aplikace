@@ -8,58 +8,41 @@
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
-        
-        /* Skrytí systémových inputů pro soubory */
         input[type="file"] { display: none; }
-
         .header-sticky { position: sticky; top: 0; background: white; width: 100%; padding: 10px 0; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .header-content { max-width: 1200px; margin: auto; padding: 0 15px; }
-        
         thead th { position: sticky; z-index: 1000; background: #444; color: white; padding: 12px 5px; text-align: left; border: 1px solid #666; font-size: 14px; }
-
         h1 { text-align: center; margin: 5px 0; font-size: 18px; color: #1a1a1a; }
         #status-bar { font-size: 11px; text-align: center; margin-bottom: 8px; color: #1976d2; font-weight: bold; background: #e3f2fd; padding: 5px; border-radius: 5px; }
         #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 44px; background: #fff3e0; padding: 8px; border-radius: 5px; border: 1px solid #ffe0b2; line-height: 1.4; display: flex; align-items: center; justify-content: center; }
-        
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s; }
         button:active { transform: scale(0.95); }
-
         .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
         #btn-new { background: var(--success); font-size: 16px; padding: 15px 5px; }
         #btn-mic { padding: 15px 5px; background: var(--danger); font-size: 16px; }
         #btn-mic.active { background: #ff7675; animation: pulse 1.5s infinite; }
         #btn-cancel-mic { display: none; background: #4b4b4b; padding: 0 15px; font-size: 20px; }
         #btn-scan { padding: 15px 5px; background: #2d3436; font-size: 16px; }
-
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; text-transform: uppercase; }
-        
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .filter-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
         .filtry-container input { padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; border: 2px solid #ccc; }
         #filtr-katalog { border-color: #f1c40f; background: #fffdf0; }
         .btn-filter-scan { position: absolute; right: 5px; background: none; color: #333; font-size: 20px; border: none; padding: 5px; cursor: pointer; }
-
         .table-container { width: 100%; max-width: 1200px; }
         table { width: 100%; border-collapse: collapse; background: white; table-layout: fixed; }
         td { border: 1px solid var(--border-color); padding: 12px 8px; font-size: 15px; outline: none; word-wrap: break-word; }
-        
-        /* 4. sloupec - Výpočet (výchozí stav: skrytý) */
         .col-calc { display: none; background: #f1f2f6; color: #57606f; font-style: italic; font-size: 13px; }
-
         td[contenteditable="true"]:focus { background: #fff9c4 !important; box-shadow: inset 0 0 0 3px var(--primary); }
         .new-row { background-color: #e3f2fd !important; border-left: 5px solid var(--primary); }
-        
         #reader-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 5000; flex-direction: column; align-items: center; justify-content: center; }
         #reader { width: 90%; max-width: 500px; border: 2px solid white; }
         #btn-stop-scan { margin-top: 20px; background: var(--danger); padding: 15px 30px; font-size: 18px; border-radius: 10px; }
-
         #modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999; }
         #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .navrh-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; cursor: pointer; color: var(--primary); font-size: 18px; text-align: center; }
-        .navrh-item:active { background: #f1f2f6; }
     </style>
 </head>
 <body onclick="manageFocus(event)">
@@ -168,8 +151,6 @@
         if (isAborting) return;
         let raw = event.results[0][0].transcript.toLowerCase();
         debugText.innerText = 'Slyšeno: "' + raw + '"';
-
-        // Základní nahrazení pro Artikly a Pozice (Logic Fix v2 core)
         let t = raw.replace(/pm/g, "PN").replace(/pe en/g, "PN").replace(/de er te/g, "DRT")
                    .replace(/lomeno/g, "/").replace(/nula/g, "0").replace(/\s+/g, "");
 
@@ -178,22 +159,15 @@
             autoUlozeni(); return;
         }
 
-        // --- STAVOVÝ AUTOMAT ---
-        if (currentStep === "waiting_qty") {
-            zpracujVypocetHlasem(raw);
-        } 
+        if (currentStep === "waiting_qty") { zpracujVypocetHlasem(raw); } 
         else if (currentStep === "confirm_qty") {
             if (raw.includes("ano") || raw.includes("ok") || raw.includes("jo") || raw.includes("správně") || raw.includes("potvrdit") || /^\d+$/.test(t)) {
-                // Pokud uživatel řekl nové číslo místo OK, zapiš to číslo, jinak zapiš výsledek
                 let finalVal = /^\d+$/.test(t) ? t : pendingCalc.result;
                 currentRow.cells[1].innerText = finalVal;
                 currentRow.cells[3].innerText = pendingCalc.formula;
                 currentStep = "waiting_pos";
                 debugText.innerText = "Uloženo: " + finalVal + ". Teď pozici...";
-            } else {
-                debugText.innerText = "Zkuste zadat počet znovu...";
-                currentStep = "waiting_qty";
-            }
+            } else { debugText.innerText = "Zkuste zadat počet znovu..."; currentStep = "waiting_qty"; }
         } 
         else if (currentStep === "waiting_pos") {
             currentRow.cells[2].innerText = t.toUpperCase();
@@ -201,60 +175,41 @@
             autoUlozeni(); currentStep = "none";
             debugText.innerText = "Hotovo. Další?";
         } 
-        else { 
-            overVstupAValiduj(t); 
-        }
+        else { overVstupAValiduj(t); }
     };
 
     function zpracujVypocetHlasem(vstup) {
         let s = vstup.toLowerCase();
-        
-        // 1. Ignorování balastu
         const noise = ["krabice", "krabic", "balení", "balíků", "balíky", "beden", "bedny", "kusů", "kusy", "kus"];
         noise.forEach(n => s = s.split(n).join(""));
-
-        // 2. Mapování operátorů (Důležité: nahrazení slovy dříve než smazání mezer)
         s = s.replace(/po|krát|x/g, "*");
         s = s.replace(/plus|a/g, "+");
         s = s.replace(/mínus/g, "-");
         s = s.replace(/lomeno/g, "/");
         s = s.replace(/,/g, ".");
-
-        // 3. Extrakce čistého vzorce (pouze čísla a operátory)
         let cleanFormula = s.replace(/[^0-9*+\-./]/g, "");
-        
         try {
             if (!cleanFormula || !/[\d]/.test(cleanFormula)) throw "No math";
-            
-            // Výpočet (eval je v tomto izolovaném kontextu bezpečný)
             let result = eval(cleanFormula);
             if (isNaN(result)) throw "NaN";
-
             pendingCalc = { result: Math.round(result * 100) / 100, formula: cleanFormula.replace(/\*/g, 'x') };
             currentStep = "confirm_qty";
             debugText.innerHTML = `VÝPOČET: <span style="color:blue; font-size:16px;">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Potvrďte slovem OK nebo dalším číslem.`;
         } catch (e) {
-            // Pokud selže matematika, zkusíme jestli to není jen jedno číslo
             let jenCislo = vstup.replace(/[^\d]/g, '');
             if (jenCislo) {
                 pendingCalc = { result: jenCislo, formula: jenCislo };
                 currentStep = "confirm_qty";
                 debugText.innerHTML = `POČET: <span style="color:blue; font-size:16px;">${jenCislo}</span>. Souhlasí? (řekněte OK)`;
-            } else {
-                debugText.innerText = "Nerozuměla jsem počtu. Zkuste znovu (např. 10 po 20).";
-            }
+            } else { debugText.innerText = "Nerozuměla jsem počtu. Zkuste znovu (např. 10 po 20)."; }
         }
     }
 
     function overVstupAValiduj(vstup) {
         let kat = vstup.toUpperCase();
         if (seznamArtiklu.includes(kat)) { dokonciZapis(kat); return; }
-        
-        // Logic Fix v2 - Oprava nul
         let zkouskaNul = kat.replace(/(\d)([2-9])0/g, (match, p1, p2) => p1 + "0".repeat(parseInt(p2)));
         if (seznamArtiklu.includes(zkouskaNul)) { dokonciZapis(zkouskaNul); return; }
-        
-        // Vyhledávání shody
         let hledanyKoren = kat.replace(/[^A-Z0-9]/g, '').toLowerCase();
         let shody = seznamArtiklu.filter(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase().includes(hledanyKoren));
         zobrazNavrhy(shody, kat);
@@ -323,6 +278,24 @@
         a.download = `inventura_${new Date().toLocaleDateString()}.csv`; a.click();
     };
 
+    // --- FIX PRO TLAČÍTKO ROZDĚLANÉ ---
+    document.getElementById('work-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const lines = ev.target.result.split('\n');
+            lines.forEach((line, index) => {
+                if (index === 0 || !line.trim()) return;
+                const cols = line.split(';').map(c => c.replace(/"/g, '').trim());
+                if (cols.length >= 3) {
+                    pridejRadek(cols[0], cols[1], cols[2], cols[3] || "", true);
+                }
+            });
+            tbody.querySelectorAll('tr').forEach(r => r.classList.remove('new-row'));
+            alert("Data z rozdělané práce byla nahrána.");
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
     function toggleMainScanner() {
         document.getElementById('reader-container').style.display = 'flex';
         html5QrCode = new Html5Qrcode("reader");
@@ -376,6 +349,16 @@
     };
 
     function aktualizujStatus() { statusBar.innerText = `📦 Artiklů: ${seznamArtiklu.length} | 🏷️ EANů: ${Object.keys(barcodeMap).length}`; }
+
+    function startScanToFilter() {
+        document.getElementById('reader-container').style.display = 'flex';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+            stopScanner();
+            document.getElementById('filtr-katalog').value = barcodeMap[decodedText] || decodedText.toUpperCase();
+            aplikujFiltry();
+        }).catch(err => stopScanner());
+    }
 
     window.onload = () => {
         const u = localStorage.getItem('skladnikDataCalcFinal');
