@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skladník 1 - FIX 3</title>
+    <title>Skladník 1 - FIX 4 (OCR)</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
     <style>
         :root { --primary: #3867d6; --secondary: #8854d0; --danger: #eb3b5a; --success: #20bf6b; --border-color: #bbbbbb; }
         body { font-family: sans-serif; background: #f0f2f5; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: center; }
@@ -17,19 +18,27 @@
         #debug-text { font-size: 13px; color: #d35400; text-align: center; margin-bottom: 5px; font-weight: bold; min-height: 44px; background: #fff3e0; padding: 8px; border-radius: 5px; border: 1px solid #ffe0b2; line-height: 1.4; display: flex; align-items: center; justify-content: center; }
         button { border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s; }
         button:active { transform: scale(0.95); }
+        
+        /* Skener a OCR Overlay */
+        #reader-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 5000; flex-direction: column; align-items: center; justify-content: center; }
+        #reader { width: 100%; max-width: 500px; position: relative; }
+        .ocr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 60px; border: 3px solid #f1c40f; border-radius: 8px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5); pointer-events: none; z-index: 5001; }
+        .ocr-guide::after { content: 'TEXT DO RÁMEČKU'; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); color: #f1c40f; font-size: 12px; font-weight: bold; white-space: nowrap; }
+        .scan-controls { position: absolute; bottom: -80px; display: flex; gap: 10px; width: 90%; justify-content: center; }
+        .btn-scan-act { padding: 15px 20px; border-radius: 10px; font-size: 14px; }
+        
+        /* Zbytek stylů z FIX 3.1 */
         .mic-container { display: grid; grid-template-columns: 1.2fr 1.5fr 0.6fr 1.2fr; gap: 8px; margin-bottom: 10px; }
         #btn-new { background: var(--success); font-size: 16px; padding: 15px 5px; }
         #btn-mic { padding: 15px 5px; background: var(--danger); font-size: 16px; }
         #btn-mic.active { background: #ff7675; animation: pulse 1.5s infinite; }
         #btn-cancel-mic { display: none; background: #4b4b4b; padding: 0 15px; font-size: 20px; }
         #btn-scan { padding: 15px 5px; background: #2d3436; font-size: 16px; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
         .mrizka { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 6px; margin-bottom: 8px; }
         .mrizka button { padding: 10px 4px; font-size: 10px; text-transform: uppercase; }
         .filtry-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
         .filter-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
         .filtry-container input { padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 15px; border: 2px solid #ccc; }
-        #filtr-katalog { border-color: #f1c40f; background: #fffdf0; }
         .btn-filter-scan { position: absolute; right: 5px; background: none; color: #333; font-size: 20px; border: none; padding: 5px; cursor: pointer; }
         .btn-filter-mic { position: absolute; right: 35px; background: none; color: #eb3b5a; font-size: 18px; border: none; padding: 5px; cursor: pointer; }
         .table-container { width: 100%; max-width: 1200px; }
@@ -38,12 +47,10 @@
         .col-calc { display: none; background: #f1f2f6; color: #57606f; font-style: italic; font-size: 13px; }
         td[contenteditable="true"]:focus { background: #fff9c4 !important; box-shadow: inset 0 0 0 3px var(--primary); }
         .new-row { background-color: #e3f2fd !important; border-left: 5px solid var(--primary); }
-        #reader-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 5000; flex-direction: column; align-items: center; justify-content: center; }
-        #reader { width: 90%; max-width: 500px; border: 2px solid white; }
-        #btn-stop-scan { margin-top: 20px; background: var(--danger); padding: 15px 30px; font-size: 18px; border-radius: 10px; }
         #modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2999; }
-        #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #modal-error { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; z-index:3000; padding:20px; border-radius:15px; width:90%; max-width:400px; max-height: 80vh; overflow-y: auto; }
         .navrh-item { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; cursor: pointer; color: var(--primary); font-size: 18px; text-align: center; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body onclick="manageFocus(event)">
@@ -56,13 +63,18 @@
 </div>
 
 <div id="reader-container">
-    <div id="reader"></div>
-    <button id="btn-stop-scan" onclick="stopScanner()">✕ ZAVŘÍT SKENER</button>
+    <div id="reader">
+        <div class="ocr-guide" id="ocr-guide"></div>
+    </div>
+    <div class="scan-controls">
+        <button class="btn-scan-act" style="background:var(--danger);" onclick="stopScanner()">✕ ZAVŘÍT</button>
+        <button class="btn-scan-act" id="btn-ocr-start" style="background:#f1c40f; color:#000;" onclick="captureAndOCR()">🔍 ČTI TEXT</button>
+    </div>
 </div>
 
 <div class="header-sticky" id="main-header">
     <div class="header-content">
-        <h1>Skladník 1 - AI Inventory Master (Calc Edition) - FIX 3 📦</h1>
+        <h1>Skladník 1 - AI Inventory Master - FIX 4 (OCR) 📦</h1>
         <div id="status-bar">Načítání...</div>
         <div id="debug-text">Slyšeno: -</div>
 
@@ -110,11 +122,13 @@
     </table>
 </div>
 
+<canvas id="ocr-canvas" style="display:none;"></canvas>
 <input type="file" id="artikl-input" accept=".csv">
 <input type="file" id="barcode-input" accept=".csv">
 <input type="file" id="work-input" accept=".csv">
 
 <script>
+    // --- ZÁKLADNÍ PROMĚNNÉ ---
     const tbody = document.querySelector('#tabulka tbody');
     const statusBar = document.getElementById('status-bar');
     const debugText = document.getElementById('debug-text');
@@ -130,20 +144,80 @@
     let html5QrCode;
     let pendingCalc = { result: 0, formula: "" };
 
-    function updateHeaderPosition() {
-        const h = document.getElementById('main-header').offsetHeight;
-        document.querySelectorAll('thead th').forEach(th => th.style.top = (h - 1) + 'px');
+    // --- OCR LOGIKA (NOVINKA) ---
+    async function captureAndOCR() {
+        const btnOcr = document.getElementById('btn-ocr-start');
+        btnOcr.innerText = "⌛ ANALÝZA...";
+        btnOcr.disabled = true;
+
+        try {
+            const video = document.querySelector('#reader video');
+            const canvas = document.getElementById('ocr-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Nastavení rozměrů plátna podle videa
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            // Výřez oblasti v rámečku (středních 80% šířky, výška 60px relativně)
+            const cropX = video.videoWidth * 0.1;
+            const cropY = (video.videoHeight / 2) - (video.videoHeight * 0.05);
+            const cropW = video.videoWidth * 0.8;
+            const cropH = video.videoHeight * 0.15;
+
+            const imageData = ctx.getImageData(cropX, cropY, cropW, cropH);
+            
+            // Jednoduchá úprava obrazu pro OCR (černobílá + kontrast)
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                let avg = (data[i] + data[i+1] + data[i+2]) / 3;
+                let val = avg > 128 ? 255 : 0; // Práh
+                data[i] = data[i+1] = data[i+2] = val;
+            }
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Spuštění Tesseractu
+            const result = await Tesseract.recognize(canvas.toDataURL(), 'ces+eng', {
+                logger: m => { if(m.status === 'recognizing text') debugText.innerText = `OCR: ${Math.round(m.progress * 100)}%`; }
+            });
+
+            const cleanedText = result.data.text.trim().toUpperCase().replace(/[^A-Z0-9-/]/g, '');
+            debugText.innerText = "OCR našlo: " + cleanedText;
+            
+            najdiNejlepsiShodu(cleanedText);
+
+        } catch (err) {
+            console.error(err);
+            debugText.innerText = "Chyba OCR. Zkuste znovu.";
+        } finally {
+            btnOcr.innerText = "🔍 ČTI TEXT";
+            btnOcr.disabled = false;
+        }
     }
-    new ResizeObserver(updateHeaderPosition).observe(document.getElementById('main-header'));
 
-    function manageFocus(e) {
-        if (e.target.closest('#btn-mic') || e.target.closest('#btn-cancel-mic') || e.target.closest('.btn-filter-mic')) return;
-        focusedCell = (e.target.tagName === 'TD' && e.target.hasAttribute('contenteditable')) ? e.target : null;
+    function najdiNejlepsiShodu(text) {
+        if (!text) return;
+        
+        // 1. Přímá shoda
+        if (seznamArtiklu.includes(text)) { stopScanner(); dokonciZapis(text); return; }
+
+        // 2. Fuzzy match - hledáme artikl, který obsahuje většinu znaků
+        let shody = seznamArtiklu.filter(a => {
+            let koren = a.replace(/[^A-Z0-9]/g, '');
+            let hledany = text.replace(/[^A-Z0-9]/g, '');
+            return koren.includes(hledany) || hledany.includes(koren);
+        });
+
+        if (shody.length > 0) {
+            stopScanner();
+            zobrazNavrhy(shody, text);
+        } else {
+            debugText.innerText = `OCR: "${text}" nenalezeno v katalogu.`;
+        }
     }
 
-    function startNewEntry() { abortAll(); focusedCell = null; document.activeElement.blur(); startRecognition(); }
-    function abortAll() { isAborting = true; recognition.abort(); currentStep = "none"; debugText.innerText = "Slyšeno: -"; }
-
+    // --- RECOGNITION & HLASOVÁ LOGIKA (FIX 3.1) ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
@@ -161,10 +235,8 @@
             aplikujFiltry(); currentStep = "none"; return;
         }
 
-        // Kalkulačka při editaci buňky POČET
         if (focusedCell && focusedCell.cellIndex === 1 && currentStep === "none") {
-            zpracujVypocetHlasem(raw);
-            return;
+            zpracujVypocetHlasem(raw); return;
         }
 
         if (focusedCell && currentStep !== "confirm_qty") {
@@ -172,33 +244,27 @@
             autoUlozeni(); return;
         }
 
-        if (currentStep === "waiting_qty") { 
-            zpracujVypocetHlasem(raw); 
-        } 
+        if (currentStep === "waiting_qty") { zpracujVypocetHlasem(raw); } 
         else if (currentStep === "confirm_qty") {
             if (raw.includes("ano") || raw.includes("ok") || raw.includes("jo") || raw.includes("správně") || raw.includes("potvrdit") || /^\d+$/.test(t)) {
                 let finalVal = /^\d+$/.test(t) ? t : pendingCalc.result;
-                
                 if (focusedCell) {
                     focusedCell.innerText = finalVal;
                     focusedCell.parentElement.cells[3].innerText = pendingCalc.formula;
                     focusedCell = null; document.activeElement.blur();
-                    currentStep = "none"; // FIX: Ukončení cyklu po potvrzení OK
-                    debugText.innerText = "Změna uložena.";
+                    currentStep = "none";
                 } else {
                     currentRow.cells[1].innerText = finalVal;
                     currentRow.cells[3].innerText = pendingCalc.formula;
                     currentStep = "waiting_pos";
-                    debugText.innerText = "Uloženo: " + finalVal + ". Teď pozici...";
                 }
                 autoUlozeni();
-            } else { debugText.innerText = "Zkuste zadat počet znovu..."; currentStep = "waiting_qty"; }
+            } else { currentStep = "waiting_qty"; }
         } 
         else if (currentStep === "waiting_pos") {
             currentRow.cells[2].innerText = t.toUpperCase();
             currentRow.classList.remove('new-row');
             autoUlozeni(); currentStep = "none";
-            debugText.innerText = "Hotovo. Další?";
         } 
         else { overVstupAValiduj(t); }
     };
@@ -218,13 +284,13 @@
             let result = eval(cleanFormula);
             pendingCalc = { result: Math.round(result * 100) / 100, formula: cleanFormula.replace(/\*/g, 'x') };
             currentStep = "confirm_qty";
-            debugText.innerHTML = `VÝPOČET: <span style="color:blue; font-size:16px;">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Potvrďte OK.`;
+            debugText.innerHTML = `VÝPOČET: <span style="color:blue;">${pendingCalc.formula} = ${pendingCalc.result}</span><br>Potvrďte OK.`;
         } catch (e) {
             let jenCislo = vstup.replace(/[^\d]/g, '');
             if (jenCislo) {
                 pendingCalc = { result: jenCislo, formula: jenCislo };
                 currentStep = "confirm_qty";
-                debugText.innerHTML = `POČET: <span style="color:blue; font-size:16px;">${jenCislo}</span>. OK?`;
+                debugText.innerHTML = `POČET: <span style="color:blue;">${jenCislo}</span>. OK?`;
             }
         }
     }
@@ -232,8 +298,6 @@
     function overVstupAValiduj(vstup) {
         let kat = vstup.toUpperCase();
         if (seznamArtiklu.includes(kat)) { dokonciZapis(kat); return; }
-        let zkouskaNul = kat.replace(/(\d)([2-9])0/g, (match, p1, p2) => p1 + "0".repeat(parseInt(p2)));
-        if (seznamArtiklu.includes(zkouskaNul)) { dokonciZapis(zkouskaNul); return; }
         let shody = seznamArtiklu.filter(a => a.replace(/[^A-Z0-9]/g,'').toLowerCase().includes(kat.toLowerCase()));
         zobrazNavrhy(shody, kat);
     }
@@ -241,46 +305,55 @@
     function dokonciZapis(kat) {
         currentRow = pridejRadek(kat, "", document.getElementById('filtr-pozice').value, "");
         currentStep = "waiting_qty";
-        debugText.innerText = "Zadejte počet (např. 10 po 20)...";
+        debugText.innerText = "Zadejte počet...";
         setTimeout(() => startRecognition(), 600);
     }
 
-    function startRecognitionForFilter(type) {
-        abortAll();
-        currentStep = (type === 'pos') ? "waiting_filter_pos" : "none";
-        debugText.innerText = "Řekněte pozici pro filtr...";
-        startRecognition();
+    // --- OSTATNÍ FUNKCE (EXPORT, UI, TABS) ---
+    function updateHeaderPosition() {
+        const h = document.getElementById('main-header').offsetHeight;
+        document.querySelectorAll('thead th').forEach(th => th.style.top = (h - 1) + 'px');
     }
+    new ResizeObserver(updateHeaderPosition).observe(document.getElementById('main-header'));
+
+    function manageFocus(e) {
+        if (e.target.closest('button') || e.target.closest('.btn-filter-mic')) return;
+        focusedCell = (e.target.tagName === 'TD' && e.target.hasAttribute('contenteditable')) ? e.target : null;
+    }
+
+    function startNewEntry() { abortAll(); focusedCell = null; document.activeElement.blur(); startRecognition(); }
+    function abortAll() { isAborting = true; recognition.abort(); currentStep = "none"; debugText.innerText = "Slyšeno: -"; }
 
     function toggleMainScanner() {
         document.getElementById('reader-container').style.display = 'flex';
         html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+        html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, (decodedText) => {
             stopScanner();
             let kat = barcodeMap[decodedText] || decodedText.toUpperCase();
             overVstupAValiduj(kat);
-        }).catch(err => stopScanner());
+        }).catch(err => {});
     }
 
     function stopScanner() {
-        if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader-container').style.display = 'none'; }).catch(() => { document.getElementById('reader-container').style.display = 'none'; });
-        else document.getElementById('reader-container').style.display = 'none';
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => { 
+                document.getElementById('reader-container').style.display = 'none'; 
+            }).catch(() => { 
+                document.getElementById('reader-container').style.display = 'none'; 
+            });
+        } else {
+            document.getElementById('reader-container').style.display = 'none';
+        }
     }
 
     function exportSFilename() {
         let defaultName = `inventura_${new Date().toLocaleDateString().replace(/\s/g, '')}`;
         let fileName = prompt("Zadejte název souboru:", defaultName);
         if (!fileName) return; 
-        
         let csv = "\ufeffKatalog;Počet;Pozice;Výpočet\n";
-        tbody.querySelectorAll('tr').forEach(tr => {
-            csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`;
-        });
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(blob);
-        a.download = `${fileName}.csv`; 
-        a.click();
+        tbody.querySelectorAll('tr').forEach(tr => { csv += `"${tr.cells[0].innerText}";"${tr.cells[1].innerText}";"${tr.cells[2].innerText}";"${tr.cells[3].innerText}"\n`; });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        a.download = `${fileName}.csv`; a.click();
     }
 
     function toggleCalcColumn() {
@@ -322,16 +395,6 @@
         document.getElementById('modal-overlay').style.display = "block";
     }
 
-    document.getElementById('work-input').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const lines = ev.target.result.split('\n');
-            lines.forEach((line, index) => { if (index === 0 || !line.trim()) return; const cols = line.split(';').map(c => c.replace(/"/g, '').trim()); if (cols.length >= 3) pridejRadek(cols[0], cols[1], cols[2], cols[3] || "", true); });
-            tbody.querySelectorAll('tr').forEach(r => r.classList.remove('new-row'));
-        };
-        reader.readAsText(e.target.files[0]);
-    };
-
     function smazatPosledni() { if (tbody.rows.length > 0 && confirm("Smazat poslední řádek?")) { tbody.deleteRow(0); autoUlozeni(); } }
     function vymazatVse() { if (confirm("Smazat ÚPLNĚ VŠE?")) { tbody.innerHTML = ""; localStorage.removeItem('skladnikDataCalcFinal'); } }
     function zavriModal() { document.getElementById('modal-error').style.display = "none"; document.getElementById('modal-overlay').style.display = "none"; }
@@ -341,6 +404,8 @@
     recognition.onstart = () => { btnMic.classList.add('active'); btnCancelMic.style.display = "block"; isAborting = false; };
     recognition.onend = () => { btnMic.classList.remove('active'); btnCancelMic.style.display = "none"; if (currentStep !== "none" && !isAborting) setTimeout(startRecognition, 400); };
 
+    function startRecognitionForFilter(type) { abortAll(); currentStep = (type === 'pos') ? "waiting_filter_pos" : "none"; startRecognition(); }
+
     function aplikujFiltry() {
         const vK = document.getElementById('filtr-katalog').value.toLowerCase();
         const vP = document.getElementById('filtr-pozice').value.toLowerCase();
@@ -349,13 +414,31 @@
 
     document.getElementById('artikl-input').onchange = (e) => {
         const reader = new FileReader();
-        reader.onload = (ev) => { seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].replace(/"/g,'').trim()).filter(c => c && c !== "Katalog"); localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu)); aktualizujStatus(); };
+        reader.onload = (ev) => { 
+            seznamArtiklu = ev.target.result.split('\n').map(r => r.split(';')[0].replace(/"/g,'').trim()).filter(c => c && c !== "Katalog"); 
+            localStorage.setItem('artiklList', JSON.stringify(seznamArtiklu)); 
+            aktualizujStatus(); 
+        };
         reader.readAsText(e.target.files[0]);
     };
 
     document.getElementById('barcode-input').onchange = (e) => {
         const reader = new FileReader();
-        reader.onload = (ev) => { ev.target.result.split('\n').forEach(r => { const d = r.split(';'); if(d[1]) barcodeMap[d[1].trim()] = d[0].trim(); }); localStorage.setItem('barcodeMap', JSON.stringify(barcodeMap)); aktualizujStatus(); };
+        reader.onload = (ev) => { 
+            ev.target.result.split('\n').forEach(r => { const d = r.split(';'); if(d[1]) barcodeMap[d[1].trim()] = d[0].trim(); }); 
+            localStorage.setItem('barcodeMap', JSON.stringify(barcodeMap)); 
+            aktualizujStatus(); 
+        };
+        reader.readAsText(e.target.files[0]);
+    };
+
+    document.getElementById('work-input').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const lines = ev.target.result.split('\n');
+            lines.forEach((line, index) => { if (index === 0 || !line.trim()) return; const cols = line.split(';').map(c => c.replace(/"/g, '').trim()); if (cols.length >= 3) pridejRadek(cols[0], cols[1], cols[2], cols[3] || "", true); });
+            tbody.querySelectorAll('tr').forEach(r => r.classList.remove('new-row'));
+        };
         reader.readAsText(e.target.files[0]);
     };
 
